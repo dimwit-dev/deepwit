@@ -5,21 +5,6 @@ import dimwit.Conversions.given
 import deepwit.cnn.AffineConv2DLayer
 import dimwit.stats.Normal
 
-trait IImageToPatchEmbedder[
-    Width: Label,
-    Height: Label,
-    Channel: Label,
-    PatchEmbedding: Label
-] extends (Tensor3[Width, Height, Channel, Float] => Tensor2[Width |*| Height, PatchEmbedding, Float]):
-
-  def encodeToPatches(img: Tensor[(Width, Height, Channel), Float]): Tensor3[Width, Height, PatchEmbedding, Float]
-  def positionalEncoding2D(patches: Shape3[Width, Height, PatchEmbedding]): Tensor3[Width, Height, PatchEmbedding, Float]
-
-  override def apply(img: Tensor3[Width, Height, Channel, Float]): Tensor2[Width |*| Height, PatchEmbedding, Float] =
-    val patches = encodeToPatches(img)
-    val patchesPos = patches + positionalEncoding2D(patches.shape)
-    patchesPos.flatten((Axis[Width], Axis[Height]))
-
 case class ConvImageToPatchEmbedder[
     Width: Label,
     Height: Label,
@@ -27,17 +12,22 @@ case class ConvImageToPatchEmbedder[
     PatchEmbedding: Label
 ](
     params: ConvImageToPatchEmbedder.Params[Width, Height, Channel, PatchEmbedding]
-) extends IImageToPatchEmbedder[Width, Height, Channel, PatchEmbedding]:
+) extends (Tensor3[Width, Height, Channel, Float] => Tensor2[Width |*| Height, PatchEmbedding, Float]):
 
   private val convLayer =
     val kernelShape = params.conv.kernel.shape
     val kernelSize = (kernelShape.extent(Axis[Width]), kernelShape.extent(Axis[Height]))
     AffineConv2DLayer(AffineConv2DLayer.HyperParams(stride = kernelSize))(params.conv)
 
-  override def encodeToPatches(img: Tensor[(Width, Height, Channel), Float]): Tensor[(Width, Height, PatchEmbedding), Float] =
+  override def apply(img: Tensor3[Width, Height, Channel, Float]): Tensor2[Width |*| Height, PatchEmbedding, Float] =
+    val patches = encodeToPatches(img)
+    val patchesPos = patches + positionalEncoding2D(patches.shape)
+    patchesPos.flatten((Axis[Width], Axis[Height]))
+
+  protected def encodeToPatches(img: Tensor[(Width, Height, Channel), Float]): Tensor[(Width, Height, PatchEmbedding), Float] =
     convLayer(img)
 
-  override def positionalEncoding2D(shape: Shape3[Width, Height, PatchEmbedding]): Tensor3[Width, Height, PatchEmbedding, Float] =
+  protected def positionalEncoding2D(shape: Shape3[Width, Height, PatchEmbedding]): Tensor3[Width, Height, PatchEmbedding, Float] =
     // 1. Prepare things we need for positional encoding
     val widthExtent = shape.extent(Axis[Width]).size
     val heightExtent = shape.extent(Axis[Height]).size

@@ -5,12 +5,11 @@ import dimwit.Conversions.given
 import deepwit.base.ActivationFunction.softmax
 import deepwit.base.LinearLayer
 
-trait ICrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label, Q: Label, K: Label, V: Label] extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, V, Float]):
-
-  def encodeToQuery(embedding: Tensor1[Embedding, Float]): Tensor1[Q, Float]
-  def encodeToKey(embedding: Tensor1[CrossEmbedding, Float]): Tensor1[K, Float]
-  def encodeToValue(embedding: Tensor1[CrossEmbedding, Float]): Tensor1[V, Float]
-  def calculateAttentionWeights(queries: Tensor2[Context, Q, Float], keys: Tensor2[CrossContext, K, Float]): Tensor2[Context, AttentionWeights, Float]
+case class CrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label, Q: Label, K: Label, V: Label](
+    hyperParams: CrossAttention.HyperParams[CrossContext, Context]
+)(
+    params: CrossAttention.BaseParams[CrossEmbedding, Embedding, Q, K, V]
+) extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, V, Float]):
 
   override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, V, Float] =
     val queries = context.vmap(Axis[Context])(encodeToQuery)
@@ -20,21 +19,15 @@ trait ICrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label
     val res = attentionWeights.dot(Axis[AttentionWeights ~ CrossContext])(values)
     res
 
-case class CrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label, Q: Label, K: Label, V: Label](
-    hyperParams: CrossAttention.HyperParams[CrossContext, Context]
-)(
-    params: CrossAttention.BaseParams[CrossEmbedding, Embedding, Q, K, V]
-) extends ICrossAttention[CrossContext, CrossEmbedding, Context, Embedding, Q, K, V]:
+  protected def encodeToQuery(embedding: Tensor1[Embedding, Float]) = LinearLayer(params.wq)(embedding)
+  protected def encodeToKey(embedding: Tensor1[CrossEmbedding, Float]) = LinearLayer(params.wk)(embedding)
+  protected def encodeToValue(embedding: Tensor1[CrossEmbedding, Float]) = LinearLayer(params.wv)(embedding)
 
-  override def encodeToQuery(embedding: Tensor1[Embedding, Float]) = LinearLayer(params.wq)(embedding)
-  override def encodeToKey(embedding: Tensor1[CrossEmbedding, Float]) = LinearLayer(params.wk)(embedding)
-  override def encodeToValue(embedding: Tensor1[CrossEmbedding, Float]) = LinearLayer(params.wv)(embedding)
-
-  def calculateAttentionScores(queries: Tensor2[Context, Q, Float], keys: Tensor2[CrossContext, K, Float]): Tensor2[Context, CrossContext, Float] =
+  protected def calculateAttentionScores(queries: Tensor2[Context, Q, Float], keys: Tensor2[CrossContext, K, Float]): Tensor2[Context, CrossContext, Float] =
     val dk = Math.sqrt(keys.shape(Axis[K])).toFloat
     queries.dot(Axis[Q ~ K])(keys) /! dk
 
-  override def calculateAttentionWeights(queries: Tensor2[Context, Q, Float], keys: Tensor2[CrossContext, K, Float]) =
+  protected def calculateAttentionWeights(queries: Tensor2[Context, Q, Float], keys: Tensor2[CrossContext, K, Float]) =
     val attentionScores = calculateAttentionScores(queries, keys)
     val attentionWeights = where(hyperParams.createAttentionMask(attentionScores.shape), attentionScores, Tensor.like(attentionScores).fill(Float.NegativeInfinity))
       .vmap(Axis[Context])(attentionScore => softmax(attentionScore).relabelTo(Axis[AttentionWeights]))

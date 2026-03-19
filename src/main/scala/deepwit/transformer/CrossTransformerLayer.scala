@@ -1,28 +1,14 @@
 package deepwit.transformer
 
 import dimwit.*
-import deepwit.base.ActivationFunction.gelu
 import deepwit.normalization.LayerNorm
 import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCrossAttention}
-
-trait ICrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label] extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, Embedding, Float]):
-
-  def contextMixer(context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float]
-  def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float]
-  def embeddingMixer(embeddings: Tensor1[Embedding, Float]): Tensor1[Embedding, Float]
-
-  override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
-    var x = context
-    x = x + contextMixer(x)
-    x = x + crossContextMixer(crossContext, x)
-    x = x + x.vmap(Axis[Context])(embeddingMixer)
-    x
 
 class CrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label](
     hyperParams: CrossTransformerLayer.HyperParams[CrossContext, Context, Embedding]
 )(
     params: CrossTransformerLayer.Params[CrossEmbedding, Embedding]
-) extends ICrossTransformerLayer[CrossContext, CrossEmbedding, Context, Embedding]:
+) extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, Embedding, Float]):
 
   private val selfAttention = MultiHeadSelfAttention(hyperParams.multiHeadAttention)(params.selfAttentionParams)
   private val selfAttentionPreNorm = LayerNorm(params.selfAttentionNormParams)
@@ -33,13 +19,20 @@ class CrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context:
   private val mlp = MLPEmbeddingMixer(hyperParams.embeddingMixer)(params.mlpParams)
   private val mlpPreNorm = LayerNorm(params.mlpNormParams)
 
-  override def embeddingMixer(embeddings: Tensor1[Embedding, Float]): Tensor1[Embedding, Float] =
+  override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
+    var x = context
+    x = x + contextMixer(x)
+    x = x + crossContextMixer(crossContext, x)
+    x = x + x.vmap(Axis[Context])(embeddingMixer)
+    x
+
+  protected def embeddingMixer(embeddings: Tensor1[Embedding, Float]): Tensor1[Embedding, Float] =
     mlp(mlpPreNorm(embeddings))
 
-  override def contextMixer(context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
+  protected def contextMixer(context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
     selfAttention(context.vmap(Axis[Context])(selfAttentionPreNorm))
 
-  override def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
+  protected def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
     crossAttention(crossContext, context.vmap(Axis[Context])(crossAttentionPreNorm))
 
 object CrossTransformerLayer:

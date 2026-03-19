@@ -7,28 +7,23 @@ import dimwit.stats.Normal
 import deepwit.base.{AffineLayer, LinearLayer}
 import deepwit.init
 
-trait IMultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label] extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, Embedding, Float]):
-
-  def headAttention(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor[(Head, Context, HeadValue), Float]
-  def headProjection(headValues: Tensor1[Head |*| HeadValue, Float]): Tensor1[Embedding, Float]
+case class MultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label](
+    hyperParams: MultiHeadCrossAttention.HyperParams[CrossContext, Context]
+)(
+    params: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding]
+) extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, Embedding, Float]):
 
   override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
     val heads = headAttention(crossContext, context)
     heads.vmap(Axis[Context])(heads => headProjection(heads.flatten))
 
-case class MultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label](
-    hyperParams: MultiHeadCrossAttention.HyperParams[CrossContext, Context]
-)(
-    params: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding]
-) extends IMultiHeadCrossAttention[CrossContext, CrossEmbedding, Context, Embedding]:
-
-  override def headAttention(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]) =
+  protected def headAttention(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]) =
     zipvmap(Axis[Head])(params.wq, params.wk, params.wv):
       case (wq, wk, wv) =>
         val headAttention = CrossAttention(hyperParams.headAttention)(CrossAttention.BaseParams(wq, wk, wv))
         headAttention(crossContext, context)
 
-  override def headProjection(headValues: Tensor1[Head |*| HeadValue, Float]) = AffineLayer(params.headProjection)(headValues)
+  protected def headProjection(headValues: Tensor1[Head |*| HeadValue, Float]) = AffineLayer(params.headProjection)(headValues)
 
 object MultiHeadCrossAttention:
 
