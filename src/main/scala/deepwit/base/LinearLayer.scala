@@ -16,6 +16,8 @@ object LinearLayer:
 
   object Params:
 
+    def identity[In: Label](extent: AxisExtent[In]): Params[In, Prime[In]] = Params(weight = Tensor2.eye(extent))
+
     def xavierNormal[In: Label, Out: Label](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Random.Key, gain: Float = 1f): Params[In, Out] =
       Params(weight = init.xavierNormal(inExtent, outExtent, key, gain = gain))
 

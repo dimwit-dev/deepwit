@@ -16,6 +16,12 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.{Matcher, MatchResult}
 import scala.compiletime.error
 
+trait A derives Label
+trait B derives Label
+trait C derives Label
+trait D derives Label
+trait E derives Label
+
 def approxEqual[T <: Tuple: Labels, V](
     right: Tensor[T, V],
     tolerance: Float = 1e-6f
