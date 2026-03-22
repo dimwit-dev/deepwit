@@ -1,14 +1,23 @@
-val scala3Version = "3.8.1"
-
 fork := true
 
-lazy val root = project
-  .in(file("."))
+ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / scalaVersion := "3.8.1"
+ThisBuild / organization := "ch.contrafactus"
+
+// Add resolver for snapshot dependencies
+ThisBuild / resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+
+addCommandAlias("testAndCoverage", "; clean; coverage; test; coverageReport")
+
+lazy val root = (project in file("."))
+  .aggregate(core, examples)
+  .settings(
+    name := "deepwit-root"
+  )
+
+lazy val core = (project in file("core"))
   .settings(
     name := "deepwit-core",
-    organization := "deepwit",
-    version := "0.1.0-SNAPSHOT",
-    scalaVersion := scala3Version,
     libraryDependencies ++= Seq(
       "org.scalameta" %% "munit" % "1.0.0" % Test,
       "org.scalatest" %% "scalatest" % "3.2.19" % Test,
@@ -16,11 +25,27 @@ lazy val root = project
       "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % Test,
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
       "ch.contrafactus" %% "dimwit-core" % "0.1.0-SNAPSHOT" changing (),
-      "ch.contrafactus" %% "dimwit-nn" % "0.1.0-SNAPSHOT" changing (),
-      // Add Plotly here, forcing the 2.13 cross-build
-      "org.plotly-scala" % "plotly-render_2.13" % "0.9.0"
+      "ch.contrafactus" %% "dimwit-nn" % "0.1.0-SNAPSHOT" changing ()
     ),
-    // Publishing settings aligned with dimwit core
     Compile / packageSrc / publishArtifact := true,
     Compile / packageDoc / publishArtifact := true
+  )
+
+// Examples subproject
+lazy val examples = (project in file("examples"))
+  .dependsOn(core)
+  .settings(
+    name := "deepwit-examples",
+    libraryDependencies ++= Seq(
+      "org.scala-lang" %% "toolkit" % "0.1.7",
+      "dev.scalapy" %% "scalapy-core" % "0.5.3"
+    ),
+    fork := true,
+    // Don't publish examples
+    publish := {},
+    publishLocal := {},
+    publishArtifact := false,
+    // Examples source directory
+    Compile / scalaSource := baseDirectory.value,
+    Compile / resourceDirectory := baseDirectory.value / "src" / "main" / "resources"
   )

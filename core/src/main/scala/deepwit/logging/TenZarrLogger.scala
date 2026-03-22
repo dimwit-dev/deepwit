@@ -4,7 +4,6 @@ import me.shadaj.scalapy.py
 import me.shadaj.scalapy.py.SeqConverters
 import dimwit.*
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
-import deepwit.example.MLPParams
 
 trait Iteration derives Label
 
@@ -127,81 +126,3 @@ class TenZarrLogger(storePath: String = "logs.zarr"):
             val raw = pyData.bracketAccess(path).bracketAccess("values").bracketAccess(iteration)
             liftPyTensor[T, V](raw)
       )
-
-@main
-def testerino() =
-  val logger = new TenZarrLogger("mlp_experiment.zarr")
-  // val params = logger.loadTree[MLPParams]("train/params", 0)
-  val (steps, losses) = logger.loadTensor0("train/loss").get
-  println(losses.shape)
-
-  import plotly.*
-  import plotly.element.*
-  import plotly.layout.*
-
-  import me.shadaj.scalapy.py
-  import me.shadaj.scalapy.py.SeqConverters
-  import plotly.Plotly.*
-
-  val currentStep = -1
-  val stepIndex = 1
-
-  val params = logger.loadTree[MLPParams]("train/params", stepIndex).get
-
-  // Assuming weight is a 2D Seq[Seq[Double]] or Array[Array[Double]]
-  val wMatrix = params.hiddenLayer.weight
-  val wFlat = wMatrix.flatten
-
-  val plotySeqwMatrix = toPyTensor(wMatrix).as[Seq[Seq[Double]]]
-  val plotySeqwFlat = toPyTensor(wFlat).as[Seq[Double]]
-
-  // Trace 1: Heatmap (Assigned to Axis 1 - Left Side)
-  val heatmap = Heatmap(plotySeqwMatrix)
-    .withColorscale(ColorScale.NamedScale("Viridis"))
-
-  // Trace 2: Histogram (Assigned to Axis 2 - Right Side)
-  val histogram = Histogram(x = plotySeqwFlat)
-
-  // 3. Layout: Define the 1x2 Subplot Grid using Domains
-  val layout = Layout()
-    .withTitle(s"Layer Weights at Step $currentStep")
-    .withShowlegend(false)
-    .withWidth(950)
-    .withHeight(450)
-    .withGrid(
-      Grid()
-        .withRows(1)
-        .withColumns(2)
-        .withPattern(Pattern.Independent)
-    )
-
-  // 4. Render the plot
-  plot("plot.html", Seq(heatmap, histogram), layout)
-
-@main
-def testerino2() =
-  val logger = new TenZarrLogger("mlp_experiment.zarr")
-
-  import me.shadaj.scalapy.py
-  import me.shadaj.scalapy.py.SeqConverters
-
-  // 1. Load the data (exactly as you did before)
-  val (stepsRaw, lossesRaw) = logger.loadTensor0("train/loss").get
-  val steps = toPyTensor(stepsRaw).as[Seq[Int]]
-  val losses = toPyTensor(lossesRaw).as[Seq[Double]]
-
-  // 2. Import matplotlib.pyplot via ScalaPy
-  val plt = py.module("matplotlib.pyplot")
-
-  // 3. Create the plot
-  // .toPythonCopy converts the Scala Seq into a Python List so matplotlib can read it
-  plt.plot(steps.toPythonCopy, losses.toPythonCopy, label = "Training Loss", color = "blue")
-
-  // 4. Set the layout and titles
-  plt.title("Training Loss")
-  plt.xlabel("Iteration")
-  plt.ylabel("Loss")
-  plt.legend()
-
-  // 5. Display the plot
-  plt.show()

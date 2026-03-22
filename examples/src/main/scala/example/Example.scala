@@ -34,7 +34,8 @@ val outputExtent = Axis[Output] -> 1
 
 @main def trainMLPWithLogging(): Unit =
   // 1. Setup Logging
-  val logger = new TenZarrLogger("mlp_experiment.zarr")
+  val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+  val logger = new TenZarrLogger(f"out/$time")
 
   // 2. Define Dimensions
   val inputExtent = Axis[Input] -> 10
@@ -43,7 +44,7 @@ val outputExtent = Axis[Output] -> 1
   val batchExtent = Axis[Batch] -> 32
 
   // 3. Initialize Parameters
-  val key = Random.Key(42)
+  val key = Random.Key.fromTime()
   val (paramsKey, dataKey, trainKey) = key.splitToTuple(3)
   val (hiddenKey, outputKey) = paramsKey.splitToTuple(2)
 
@@ -94,11 +95,5 @@ val outputExtent = Axis[Output] -> 1
 
       // Log Scalar Loss
       logger.log("train/loss", i, currentLoss)
-
-      // Log Layer 1 Weights (as a 2D Tensor)
-      logger.log("weights/layer1", i, mlpParams.hiddenLayer.weight)
-
-      // Log Output Layer Weights
-      logger.log("weights/output", i, mlpParams.outputLayer.weight)
 
   println("Training complete. Data saved to mlp_experiment.zarr")
