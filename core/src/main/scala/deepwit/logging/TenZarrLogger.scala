@@ -7,22 +7,26 @@ import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
 
 trait Iteration derives Label
 
-class TenZarrLogger(storePath: String = "logs.zarr"):
+class TenZarrLogger(storePath: String):
 
   private val zarr = py.module("zarr")
   private val np = py.module("numpy")
   private val root = zarr.open(storePath, mode = "a")
 
-  def logTree[Data: TensorTree](name: String, iteration: Int, data: Data): Unit =
+  def logMetadata(name: String, data: Any): Unit =
+    // TODO
+    ???
+
+  def logTensorTree[Data: TensorTree](name: String, iteration: Int, data: Data): Unit =
     TensorTree.foreach(
       data,
       [T <: Tuple, V] =>
         (labels: Labels[T]) ?=>
           (tensorName: String, tensor: Tensor[T, V]) =>
-            log(s"$name/$tensorName", iteration, tensor)
+            logTensor(s"$name/$tensorName", iteration, tensor)
     )
 
-  def log[T <: Tuple, V](name: String, iteration: Int, data: Tensor[T, V]): Unit =
+  def logTensor[T <: Tuple, V](name: String, iteration: Int, data: Tensor[T, V]): Unit =
     val pyData = np.array(toPyTensor(data))
     val dimSizes = data.shape.dimensions
 

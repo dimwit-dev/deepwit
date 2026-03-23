@@ -7,9 +7,7 @@ import dimwit.stats.Normal
 import deepwit.base.{AffineLayer, LinearLayer}
 import deepwit.init
 
-case class MultiHeadSelfAttention[Context: Label, Embedding: Label](
-    hyperParams: MultiHeadSelfAttention.HyperParams[Context]
-)(
+trait MultiHeadSelfAttention[Context: Label, Embedding: Label](
     params: MultiHeadSelfAttention.Params[Embedding]
 ) extends (Tensor2[Context, Embedding, Float] => Tensor2[Context, Embedding, Float]):
 
@@ -22,16 +20,25 @@ case class MultiHeadSelfAttention[Context: Label, Embedding: Label](
   protected def headAttention(context: Tensor2[Context, Embedding, Float]): Tensor[(Head, Context, HeadValue), Float] =
     zipvmap(Axis[Head])(params.wq, params.wk, params.wv):
       case (wq, wk, wv) =>
-        val attention = SelfAttention(hyperParams.headAttention)(SelfAttention.BaseParams(wq, wk, wv))
-        attention(context)
+        selfAttention(SelfAttention.Params(wq, wk, wv))(context)
 
   protected def headProjection(headValues: Tensor1[Head |*| HeadValue, Float]) = headProjectionLayer(headValues)
 
-object MultiHeadSelfAttention:
+  protected def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue]): SelfAttention[Context, Embedding, HeadQuery, HeadKey, HeadValue]
 
-  case class HyperParams[Context](
-      headAttention: SelfAttention.HyperParams[Context]
-  )
+case class MultiHeadCausalSelfAttention[Context: Label, Embedding: Label](
+    params: MultiHeadSelfAttention.Params[Embedding]
+) extends MultiHeadSelfAttention[Context, Embedding](params):
+
+  protected override def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue]) = CausalSelfAttention(params)
+
+case class MultiHeadFullSelfAttention[Context: Label, Embedding: Label](
+    params: MultiHeadSelfAttention.Params[Embedding]
+) extends MultiHeadSelfAttention[Context, Embedding](params):
+
+  protected override def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue]) = FullSelfAttention(params)
+
+object MultiHeadSelfAttention:
 
   case class Params[Embedding](
       wq: Tensor3[Head, Embedding, HeadQuery, Float],

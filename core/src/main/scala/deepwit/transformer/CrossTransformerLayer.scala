@@ -2,7 +2,7 @@ package deepwit.transformer
 
 import dimwit.*
 import deepwit.normalization.LayerNorm
-import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCrossAttention}
+import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCausalSelfAttention, MultiHeadCrossAttention}
 
 class CrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label](
     hyperParams: CrossTransformerLayer.HyperParams[CrossContext, Context, Embedding]
@@ -10,7 +10,7 @@ class CrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context:
     params: CrossTransformerLayer.Params[CrossEmbedding, Embedding]
 ) extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, Embedding, Float]):
 
-  private val selfAttention = MultiHeadSelfAttention(hyperParams.multiHeadAttention)(params.selfAttentionParams)
+  private val selfAttention = MultiHeadCausalSelfAttention[Context, Embedding](params.selfAttentionParams)
   private val selfAttentionPreNorm = LayerNorm(params.selfAttentionNormParams)
 
   private val crossAttention = new MultiHeadCrossAttention(hyperParams.multiHeadCrossAttention)(params.crossAttentionParams)
@@ -42,7 +42,6 @@ object CrossTransformerLayer:
 
   case class HyperParams[CrossContext: Label, Context: Label, Embedding: Label](
       embeddingMixer: MLPEmbeddingMixer.HyperParams[Embedding],
-      multiHeadAttention: MultiHeadSelfAttention.HyperParams[Context],
       multiHeadCrossAttention: MultiHeadCrossAttention.HyperParams[CrossContext, Context]
   )
 

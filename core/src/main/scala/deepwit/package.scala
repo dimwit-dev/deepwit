@@ -3,7 +3,7 @@ package object deepwit:
   export deepwit.base.ActivationFunction.{gelu, relu, sigmoid, softmax}
   export deepwit.cnn.{AffineConv2DLayer, LinearConv2DLayer}
   export deepwit.embedder.{ConvImageToPatchEmbedder, LearnedAbsolutePositionalInjector, VocabularyEmbedder}
-  export deepwit.transformer.{MLPEmbeddingMixer, Transformer, TransformerLayer, CrossTransformer, CrossTransformerLayer}
+  export deepwit.transformer.{MLPEmbeddingMixer, Transformer, TransformerLayer, CrossTransformer, CrossTransformerLayer, CausalTransformer, BidirectionalTransformer}
   export deepwit.transformer.{causalMask, identityMask}
   export deepwit.transformer.attention.{SelfAttention, CrossAttention, MultiHeadSelfAttention, MultiHeadCrossAttention}
   export deepwit.init.{xavierNormal, xavierUniform}

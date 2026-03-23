@@ -3,15 +3,16 @@ package deepwit.transformer
 import dimwit.*
 import deepwit.base.ActivationFunction.gelu
 import deepwit.normalization.LayerNorm
-import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention}
+import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCausalSelfAttention, MultiHeadFullSelfAttention}
 
-class TransformerLayer[Context: Label, Embedding: Label](
+trait TransformerLayer[Context: Label, Embedding: Label](
     hyperParams: TransformerLayer.HyperParams[Context, Embedding]
 )(
     params: TransformerLayer.Params[Embedding]
 ) extends (Tensor2[Context, Embedding, Float] => Tensor2[Context, Embedding, Float]):
 
-  val selfAttention = MultiHeadSelfAttention(hyperParams.multiHeadAttention)(params.attentionParams)
+  def selfAttention: MultiHeadSelfAttention[Context, Embedding] // = MultiHeadSelfAttention(hyperParams.multiHeadAttention)(params.attentionParams)
+
   val selfAttentionNorm = LayerNorm(params.attentionNormParams)
 
   val mlp = MLPEmbeddingMixer(hyperParams.embeddingMixer)(params.mlpParams)
@@ -31,14 +32,24 @@ class TransformerLayer[Context: Label, Embedding: Label](
     x = x + x.vmap(Axis[Context])(embeddingMixer)
     x
 
+case class CausalTransformerLayer[Context: Label, Embedding: Label](
+    hyperParams: TransformerLayer.HyperParams[Context, Embedding]
+)(
+    params: TransformerLayer.Params[Embedding]
+) extends TransformerLayer[Context, Embedding](hyperParams)(params):
+  override val selfAttention = MultiHeadCausalSelfAttention[Context, Embedding](params.attentionParams)
+
+case class BidirectionalTransformerLayer[Context: Label, Embedding: Label](
+    hyperParams: TransformerLayer.HyperParams[Context, Embedding]
+)(
+    params: TransformerLayer.Params[Embedding]
+) extends TransformerLayer[Context, Embedding](hyperParams)(params):
+  override val selfAttention = MultiHeadFullSelfAttention[Context, Embedding](params.attentionParams)
+
 object TransformerLayer:
 
-  def apply[Context: Label, Embedding: Label](hyperParams: HyperParams[Context, Embedding])(params: Params[Embedding]): TransformerLayer[Context, Embedding] =
-    new TransformerLayer(hyperParams)(params)
-
   case class HyperParams[Context: Label, Embedding: Label](
-      embeddingMixer: MLPEmbeddingMixer.HyperParams[Embedding],
-      multiHeadAttention: MultiHeadSelfAttention.HyperParams[Context]
+      embeddingMixer: MLPEmbeddingMixer.HyperParams[Embedding]
   )
 
   case class Params[Embedding](

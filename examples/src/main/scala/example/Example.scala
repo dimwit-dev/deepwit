@@ -80,10 +80,10 @@ val outputExtent = Axis[Output] -> 1
     // Compute Gradients and Update
     val currentLoss = lossFn(mlpParams, batchX, batchY)
     val grads = Autodiff.grad(p => lossFn(p, batchX, batchY))(mlpParams)
-    logger.logTree(s"train/grad", i, grads)
+    logger.logTensorTree(s"train/grad", i, grads)
 
     val (nextParams, nextOptState) = optimizer.update(grads, mlpParams, optState)
-    logger.logTree(s"train/params", i, nextParams)
+    logger.logTensorTree(s"train/params", i, nextParams)
 
     mlpParams = nextParams
     optState = nextOptState
@@ -94,6 +94,6 @@ val outputExtent = Axis[Output] -> 1
       println(f"Iteration $i - Loss: ${currentLoss.item}%.4f")
 
       // Log Scalar Loss
-      logger.log("train/loss", i, currentLoss)
+      logger.logTensor("train/loss", i, currentLoss)
 
   println("Training complete. Data saved to mlp_experiment.zarr")
