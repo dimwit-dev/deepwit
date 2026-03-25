@@ -33,11 +33,3 @@ package object gpt:
 
   object Timer:
     def start(): Timer = new Timer()
-
-  extension [T](it: LazyList[T])
-    def tapEvery(n: Int)(f: (T, Int) => Unit): LazyList[T] =
-      it
-        .zipWithIndex
-        .tapEach: (t, id) =>
-          if id % n == (n - 1) then f(t, id)
-        .map(_._1)
