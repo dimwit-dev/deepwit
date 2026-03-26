@@ -102,7 +102,7 @@ def autoEncoderEval(checkpointPath: String) =
       val latent = model.encoder(sample.flatten)
       val value = latent.slice(Axis[Latent].at(dimIdx))
       val latentTraversed = latent.set(Axis[Latent].at(dimIdx))(value + eps)
-      model.decode(latentTraversed)
+      model.decoder(latentTraversed)
     .unflatten(Axis[Height |*| Width], Shape2(Axis[Height] -> 28, Axis[Width] -> 28))
 
     recDisplay.set_data(toPyTensor(toImg2D(rec)))

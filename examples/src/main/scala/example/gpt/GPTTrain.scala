@@ -129,7 +129,7 @@ case class BatchSample(
       targets: Tensor1[Context, Int],
       logits: Tensor2[Context, Vocab, Float]
   ): Tensor0[Float] =
-    zipvmap(Axis[Context])(logits, targets)(crossEntropy).mean
+    zipvmap(Axis[Context])(targets, logits)(CategoricalCrossEntropy.fromLogits).mean
 
   def costFunFor(
       batchSample: BatchSample

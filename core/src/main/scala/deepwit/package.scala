@@ -13,7 +13,7 @@ package object deepwit:
   // Dropout thinning
   export deepwit.regularization.{sampleThinAffineLayer, sampleThinLearnedAbsolutePositionalInjector, sampleThinLinearLayer, sampleThinProjection, sampleThinVocabularyEmbedder}
 
-  export deepwit.loss.crossEntropy
+  export deepwit.loss.{BinaryCrossEntropy, CategoricalCrossEntropy, BernoulliCrossEntropy}
 
   object labels:
     export deepwit.transformer.MLPEmbeddingMixer.EmbeddingMixed

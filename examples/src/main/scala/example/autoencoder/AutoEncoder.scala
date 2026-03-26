@@ -13,9 +13,8 @@ case class Autoencoder(params: Autoencoder.Params):
   val encoder = Autoencoder.Encoder(params.encoderParams)
   val decoder = Autoencoder.Decoder(params.decoderParams)
 
-  def apply(v: Tensor1[Pixel, Float]): Tensor1[ReconstructedPixel, Float] = decode(encode(v))
-  def encode(x: Tensor1[Pixel, Float]): Tensor1[Latent, Float] = encoder(x)
-  def decode(x: Tensor1[Latent, Float]): Tensor1[ReconstructedPixel, Float] = decoder(x)
+  def logits(x: Tensor1[Pixel, Float]): Tensor1[ReconstructedPixel, Float] = decoder.logits(encoder(x))
+  def apply(x: Tensor1[Pixel, Float]): Tensor1[ReconstructedPixel, Float] = decoder(encoder(x))
 
 object Autoencoder:
 
@@ -74,10 +73,12 @@ object Autoencoder:
     val layer2 = AffineLayer(p.layer2)
     val outputLayer = AffineLayer(p.outputLayer)
 
-    def apply(v: Tensor1[Latent, Float]): Tensor1[ReconstructedPixel, Float] =
+    def logits(v: Tensor1[Latent, Float]): Tensor1[ReconstructedPixel, Float] =
       val h1 = relu(layer1(v))
       val h2 = relu(layer2(h1))
-      sigmoid(outputLayer(h2))
+      outputLayer(h2)
+
+    def apply(v: Tensor1[Latent, Float]): Tensor1[ReconstructedPixel, Float] = sigmoid(logits(v))
 
   object Decoder:
     case class Params(

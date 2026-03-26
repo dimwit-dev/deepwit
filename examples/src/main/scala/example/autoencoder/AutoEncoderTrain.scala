@@ -20,15 +20,6 @@ import deepwit.logging.TenZarrLogger
 
 private trait Batch derives Label
 
-def binaryCrossEntropy[L: Label](
-    target: Tensor1[L, Float],
-    pred: Tensor1[L, Float],
-    eps: Float = 1e-7f
-): Tensor0[Float] =
-  val p = pred.clip(eps, 1f - eps) // Clamp predictions to [eps, 1 - eps] for numerical stability
-  val loss = -((target * p.log) + ((Tensor0(1f) -! target) * (1f -! p).log))
-  loss.sum
-
 case class TrainState(params: Autoencoder.Params, lastCost: Tensor0[Float])
 
 @main
@@ -68,7 +59,9 @@ def autoEncoderTraining(): Unit =
     samples
       .vmap(Axis[S]): sample =>
         val original = sample.flatten
-        binaryCrossEntropy(original, model(original))
+        zipvmap(Axis[Pixel])(original, model.logits(original)): (origPixel, reconPixel) =>
+          BinaryCrossEntropy.fromLogits(origPixel, reconPixel)
+        .sum
       .mean
 
   val optimizer = GradientDescent(learningRate = Tensor0(learningRate))
