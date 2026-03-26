@@ -18,7 +18,7 @@ import MNISTLoader.{Sample, TrainSample, TestSample}
 import dimwit.python.PyBridge.toPyTensor
 import deepwit.logging.TenZarrLogger
 
-trait Batch derives Label
+private trait Batch derives Label
 
 def binaryCrossEntropy[L: Label](
     target: Tensor1[L, Float],
@@ -42,7 +42,7 @@ def autoEncoderTraining(): Unit =
 
   val eHidden1Extent = Axis[EHidden1] -> 512
   val eHidden2Extent = Axis[EHidden2] -> 256
-  val latentExtent = Axis[Latent] -> 20
+  val latentExtent = Axis[Latent] -> latentDim
   val dHidden1Extent = Axis[DHidden1] -> 256
   val dHidden2Extent = Axis[DHidden2] -> 512
 
@@ -50,14 +50,6 @@ def autoEncoderTraining(): Unit =
 
   val (trainX, trainY) = MNISTLoader.createTrainingDataset().get
   val (testX, testY) = MNISTLoader.createTestDataset().get
-
-  def costFnFor[S: Label](samples: Tensor3[S, Height, Width, Float])(params: Autoencoder.Params): Tensor0[Float] =
-    val model = Autoencoder(params)
-    samples
-      .vmap(Axis[S]): sample =>
-        val original = sample.flatten
-        binaryCrossEntropy(original, model(original))
-      .mean
 
   def batchStream[S: Label](
       imgs: Tensor3[S, Height, Width, Float],
@@ -70,6 +62,14 @@ def autoEncoderTraining(): Unit =
       imgs.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
 
   val trainDataStream = batchStream(trainX, trainY, batchSize)
+
+  def costFnFor[S: Label](samples: Tensor3[S, Height, Width, Float])(params: Autoencoder.Params): Tensor0[Float] =
+    val model = Autoencoder(params)
+    samples
+      .vmap(Axis[S]): sample =>
+        val original = sample.flatten
+        binaryCrossEntropy(original, model(original))
+      .mean
 
   val optimizer = GradientDescent(learningRate = Tensor0(learningRate))
 
@@ -103,13 +103,13 @@ def autoEncoderTraining(): Unit =
       case (state, step) =>
         println(trainMonitor.report(step, state))
     .tapEvery(500):
-      case (state, epoch) =>
+      case (state, step) =>
         val lossValue = costFnFor(testX)(state.params).item
-        println(s"Epoch $epoch | Test loss: $lossValue")
+        println(s"Step $step | Test loss: $lossValue")
     .tapEvery(500):
-      case (state, epoch) =>
-        println("Saving checkpoint...")
-        logger.logTensorTree("checkpoint", epoch, state)
+      case (state, step) =>
+        logger.logTensorTree("checkpoint", step, state)
+        println(s"Checkpoint saved at epoch $step")
     .drop(numIterations)
     .head
 

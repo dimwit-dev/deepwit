@@ -47,5 +47,12 @@ lazy val examples = (project in file("examples"))
     publishArtifact := false,
     // Examples source directory
     Compile / scalaSource := baseDirectory.value,
-    Compile / resourceDirectory := baseDirectory.value / "src" / "main" / "resources"
+    Compile / resourceDirectory := baseDirectory.value / "src" / "main" / "resources",
+    javaOptions ++= {
+      if (sys.props("os.name").toLowerCase.contains("mac")) {
+        Seq("-XstartOnFirstThread") // For MacOS to run Python with GUI support
+      } else {
+        Seq.empty
+      }
+    }
   )

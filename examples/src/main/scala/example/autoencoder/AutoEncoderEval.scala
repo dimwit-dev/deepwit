@@ -20,7 +20,26 @@ def toImg2D(tensor: Tensor[(TestSample, Height, Width), Float]): Tensor[(Prime[H
     )
 
 @main
-def autoEncoderEval(checkpointFolder: String) =
+/** Opens an interactive Matplotlib dashboard to evaluate an Autoencoder's performance.
+  *
+  * The UI displays three side-by-side image grids:
+  * 1. '''Original''': The baseline MNIST test samples.
+  * 2. '''Reconstruction''': The model's output at a specific training checkpoint.
+  * 3. '''Latent Traversal''': The reconstruction after manually tweaking a specific
+  * latent dimension by a user-defined epsilon.
+  *
+  * Interactive controls (sliders) allow the user to scrub through training
+  * iterations, select latent dimensions, and adjust the traversal intensity
+  * in real-time.
+  *
+  * @param checkpointPath The path to the checkpoint containing the AutoEncoder TrainState.
+  */
+def autoEncoderEval(checkpointPath: String) =
+
+  println(s"Loading checkpoints from: $checkpointPath")
+
+  val matplotlib = py.module("matplotlib")
+  matplotlib.use("WebAgg")
   val plt = py.module("matplotlib.pyplot")
   val widgets = py.module("matplotlib.widgets")
 
@@ -29,7 +48,9 @@ def autoEncoderEval(checkpointFolder: String) =
   val original = testX.slice(Axis[TestSample].at(0 until 64))
   val originalImg = toPyTensor(toImg2D(original))
 
-  val logger = new TenZarrLogger(f"out/AutoEncoder/$checkpointFolder")
+  val emptyPlaceholderImg = toPyTensor(toImg2D(Tensor.like(original).fill(0f)))
+
+  val logger = new TenZarrLogger(checkpointPath)
   val iterations = logger.iterations("checkpoint")
 
   // 2. Setup Figure and Subplots
@@ -41,15 +62,15 @@ def autoEncoderEval(checkpointFolder: String) =
   axOrig.imshow(originalImg, cmap = "gray")
 
   val axRec = fig.add_subplot(1, 3, 2)
-  val recDisplay = axRec.imshow(originalImg, cmap = "gray")
+  val recDisplay = axRec.imshow(emptyPlaceholderImg, cmap = "gray", vmin = 0, vmax = 1)
   axRec.set_title(s"Iteration ${iterations.head}")
 
   val axTraversal = fig.add_subplot(1, 3, 3)
-  val traversalDisplay = axTraversal.imshow(originalImg, cmap = "gray") // Placeholder
+  val traversalDisplay = axTraversal.imshow(emptyPlaceholderImg, cmap = "gray", vmin = 0, vmax = 1)
   axTraversal.set_title("Latent Traversal")
 
   val axIter = fig.add_axes(List(0.25, 0.2, 0.5, 0.03).toPythonCopy)
-  val sIter = widgets.Slider(axIter, "Iteration", iterations.min.toDouble, iterations.max.toDouble, valstep = 500.0)
+  val sIter = widgets.Slider(axIter, "Iteration", iterations.min.toDouble, iterations.max.toDouble, valstep = iterations.toPythonCopy)
 
   val axDim = fig.add_axes(List(0.25, 0.15, 0.5, 0.03).toPythonCopy)
   val sDim = widgets.Slider(axDim, "Latent Dim", 0, 19, valinit = 0, valstep = 1)
@@ -58,13 +79,19 @@ def autoEncoderEval(checkpointFolder: String) =
   val sEps = widgets.Slider(axEps, "Epsilon", 0.0, 100.0, valinit = 0.0)
 
   // 4. Define Update Logic
+  var model = Autoencoder(logger.loadTensorTree[TrainState]("checkpoint", iteration = iterations.head).get.params)
+  var currentIt = iterations.head
   val update = (valVal: py.Any) =>
     val it = sIter.`val`.as[Double].toInt
     val dimIdx = sDim.`val`.as[Double].toInt
     val eps = sEps.`val`.as[Float]
 
     val state = logger.loadTensorTree[TrainState]("checkpoint", iteration = it).get
-    val model = Autoencoder(state.params)
+    if currentIt != it then
+      // Only load model if iteration has changed, avoid redundant loading
+      println(s"Loading checkpoint for iteration: $it")
+      currentIt = it
+      model = Autoencoder(state.params)
 
     val rec = original.vmap(Axis[TestSample]): sample =>
       model(sample.flatten)
@@ -89,7 +116,3 @@ def autoEncoderEval(checkpointFolder: String) =
   sEps.on_changed(update)
 
   plt.show()
-
-import me.shadaj.scalapy.py
-import example.autoencoder as i
-import example.autoencoder as logger
