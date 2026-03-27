@@ -8,6 +8,23 @@ import me.shadaj.scalapy.py.SeqConverters
 import java.io.RandomAccessFile
 import scala.util.Try
 
+import MNISTLoader.{Width, Height}
+
+case class MNISTBatchSample[Batch](images: Tensor[(Batch, Height, Width), Float], labels: Tensor1[Batch, Int])
+
+case class MNISTDataset[S: Label](images: Tensor3[S, Height, Width, Float], labels: Tensor1[S, Int]):
+
+  def toBatchStream[Batch: Label](
+      batchExtent: AxisExtent[Batch]
+  ): LazyList[MNISTBatchSample[Batch]] =
+    val totalSamples = images.shape(Axis[S])
+    val batchSize = batchExtent.size
+    LazyList.iterate(0)(_ + batchSize).map: offset =>
+      val batchIds = (0 until batchSize).map(i => (offset + i) % totalSamples)
+      val batchImages = images.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
+      val batchLabels = labels.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
+      MNISTBatchSample(batchImages, batchLabels)
+
 object MNISTLoader:
 
   trait Sample derives Label
@@ -61,20 +78,20 @@ object MNISTLoader:
     finally
       file.close()
 
-  private def createDataset[S <: Sample: Label](imagesFile: String, labelsFile: String): Try[Tuple2[Tensor[(S, Height, Width), Float], Tensor1[S, Int]]] =
+  private def createDataset[S <: Sample: Label](imagesFile: String, labelsFile: String): Try[MNISTDataset[S]] =
     Try:
       val images = loadImages[S](imagesFile)
       val labels = loadLabels[S](labelsFile)
       require(images.shape(Axis[S]) == labels.shape(Axis[S]), s"Number of images and labels must match")
       val imagesFloat = images.asFloat /! 255.0f
-      (imagesFloat, labels)
+      MNISTDataset(imagesFloat, labels)
 
-  def createTrainingDataset(dataDir: String = "data"): Try[Tuple2[Tensor[(TrainSample, Height, Width), Float], Tensor1[TrainSample, Int]]] =
+  def createTrainingDataset(dataDir: String = "data"): Try[MNISTDataset[TrainSample]] =
     val imagesFile = s"$dataDir/train-images-idx3-ubyte"
     val labelsFile = s"$dataDir/train-labels-idx1-ubyte"
     createDataset[TrainSample](imagesFile, labelsFile)
 
-  def createTestDataset(dataDir: String = "data"): Try[Tuple2[Tensor[(TestSample, Height, Width), Float], Tensor1[TestSample, Int]]] =
+  def createTestDataset(dataDir: String = "data"): Try[MNISTDataset[TestSample]] =
     val imagesFile = s"$dataDir/t10k-images-idx3-ubyte"
     val labelsFile = s"$dataDir/t10k-labels-idx1-ubyte"
     createDataset[TestSample](imagesFile, labelsFile)

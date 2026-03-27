@@ -44,8 +44,8 @@ def autoEncoderEval(checkpointPath: String) =
   val widgets = py.module("matplotlib.widgets")
 
   // ... (Keep your toImg2D and MNISTLoader logic here) ...
-  val (testX, testY) = MNISTLoader.createTestDataset().get
-  val original = testX.slice(Axis[TestSample].at(0 until 64))
+  val testDataset = MNISTLoader.createTestDataset().get
+  val original = testDataset.images.slice(Axis[TestSample].at(0 until 64))
   val originalImg = toPyTensor(toImg2D(original))
 
   val emptyPlaceholderImg = toPyTensor(toImg2D(Tensor.like(original).fill(0f)))

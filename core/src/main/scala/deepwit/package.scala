@@ -2,7 +2,7 @@ import scala.languageFeature.experimental.macros
 package object deepwit:
   export deepwit.base.{AffineLayer, LinearLayer}
   export deepwit.base.ActivationFunction.{gelu, relu, sigmoid, softmax}
-  export deepwit.cnn.{AffineConv2DLayer, LinearConv2DLayer}
+  export deepwit.cnn.{Conv2DLayer, AffineConv2DLayer, LinearConv2DLayer}
   export deepwit.embedder.{ConvImageToPatchEmbedder, LearnedAbsolutePositionalInjector, VocabularyEmbedder}
   export deepwit.transformer.{MLPEmbeddingMixer, Transformer, TransformerLayer, CrossTransformer, CrossTransformerLayer, CausalTransformer, BidirectionalTransformer}
   export deepwit.transformer.{causalMask, identityMask}

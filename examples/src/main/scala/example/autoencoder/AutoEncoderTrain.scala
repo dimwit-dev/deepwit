@@ -39,20 +39,10 @@ def autoEncoderTraining(): Unit =
 
   val initKey = Random.Key.fromTime()
 
-  val (trainX, trainY) = MNISTLoader.createTrainingDataset().get
-  val (testX, testY) = MNISTLoader.createTestDataset().get
+  val trainDataset = MNISTLoader.createTrainingDataset().get
+  val testDataset = MNISTLoader.createTestDataset().get
 
-  def batchStream[S: Label](
-      imgs: Tensor3[S, Height, Width, Float],
-      labels: Tensor1[S, Int],
-      batchSize: Int
-  ): LazyList[Tensor3[Batch, Height, Width, Float]] =
-    val totalSamples = imgs.shape(Axis[S])
-    LazyList.iterate(0)(_ + batchSize).map: offset =>
-      val batchIds = (0 until batchSize).map(i => (offset + i) % totalSamples)
-      imgs.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
-
-  val trainDataStream = batchStream(trainX, trainY, batchSize)
+  val trainDataStream = trainDataset.toBatchStream(Axis[Batch] -> batchSize).map(_.images)
 
   def costFnFor[S: Label](samples: Tensor3[S, Height, Width, Float])(params: Autoencoder.Params): Tensor0[Float] =
     val model = Autoencoder(params)
@@ -97,7 +87,7 @@ def autoEncoderTraining(): Unit =
         println(trainMonitor.report(step, state))
     .tapEvery(500):
       case (state, step) =>
-        val lossValue = costFnFor(testX)(state.params).item
+        val lossValue = costFnFor(testDataset.images)(state.params).item
         println(s"Step $step | Test loss: $lossValue")
     .tapEvery(500):
       case (state, step) =>
