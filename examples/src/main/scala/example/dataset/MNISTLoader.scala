@@ -10,9 +10,9 @@ import scala.util.Try
 
 import MNISTLoader.{Width, Height}
 
-case class MNISTBatchSample[Batch](images: Tensor[(Batch, Height, Width), Float], labels: Tensor1[Batch, Int])
+case class MNISTBatchSample[Batch](images: Tensor[(Batch, Height, Width), Float32], labels: Tensor1[Batch, Int32])
 
-case class MNISTDataset[S: Label](images: Tensor3[S, Height, Width, Float], labels: Tensor1[S, Int]):
+case class MNISTDataset[S: Label](images: Tensor3[S, Height, Width, Float32], labels: Tensor1[S, Int32]):
 
   def toBatchStream[Batch: Label](
       batchExtent: AxisExtent[Batch]
@@ -35,7 +35,7 @@ object MNISTLoader:
 
   private val pythonLoader = py.eval("lambda b64, shape: __import__('jax').numpy.array(__import__('numpy').frombuffer(__import__('base64').b64decode(b64), dtype=__import__('numpy').uint8).reshape(shape).astype(__import__('numpy').int32))")
 
-  def loadImages[S <: Sample: Label](filename: String): Tensor3[S, Height, Width, Int] =
+  def loadImages[S <: Sample: Label](filename: String): Tensor3[S, Height, Width, UInt8] =
     val file = new RandomAccessFile(filename, "r")
     try
       val magic = file.readInt()
@@ -55,13 +55,12 @@ object MNISTLoader:
 
       // MNIST pixels are unsigned bytes
       // So we read them as Byte and interpret as UInt8 when creating the Tensor
-      given ExecutionType[Byte] = ExecutionTypeFor[Byte](DType.UInt8)
-      Tensor(shape).fromArray(pixels)
+      Tensor(shape, VType[UInt8]).fromArray(pixels)
 
     finally
       file.close()
 
-  def loadLabels[S <: Sample: Label](filename: String): Tensor1[S, Int] =
+  def loadLabels[S <: Sample: Label](filename: String): Tensor1[S, UInt8] =
     val file = new RandomAccessFile(filename, "r")
     try
       val magic = file.readInt()
@@ -73,7 +72,7 @@ object MNISTLoader:
       file.readFully(labels)
 
       val shape = Shape(Axis[S] -> totalLabels)
-      Tensor(shape).fromArray(labels)
+      Tensor(shape, VType[UInt8]).fromArray(labels)
 
     finally
       file.close()
@@ -83,8 +82,8 @@ object MNISTLoader:
       val images = loadImages[S](imagesFile)
       val labels = loadLabels[S](labelsFile)
       require(images.shape(Axis[S]) == labels.shape(Axis[S]), s"Number of images and labels must match")
-      val imagesFloat = images.asFloat /! 255.0f
-      MNISTDataset(imagesFloat, labels)
+      val imagesFloat = images.asFloat32 /! 255.0f
+      MNISTDataset(imagesFloat, labels.asInt32)
 
   def createTrainingDataset(dataDir: String = "data"): Try[MNISTDataset[TrainSample]] =
     val imagesFile = s"$dataDir/train-images-idx3-ubyte"

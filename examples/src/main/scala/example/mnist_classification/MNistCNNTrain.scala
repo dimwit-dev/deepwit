@@ -13,7 +13,7 @@ import deepwit.logging.TenZarrLogger
 
 private trait Batch derives Label
 
-case class TrainState(params: MNistCNN.Params, lastCost: Tensor0[Float])
+case class TrainState(params: MNistCNN.Params, lastCost: Tensor0[Float32])
 
 @main
 def mnistCNNTrain(): Unit =
@@ -31,16 +31,16 @@ def mnistCNNTrain(): Unit =
 
   val initialParams = MNistCNN.Params(trainKey)(16, 32)
 
-  def batchLoss(batchImages: Tensor[(Batch, Height, Width), Float], batchLabels: Tensor1[Batch, Int])(
+  def batchLoss(batchImages: Tensor[(Batch, Height, Width), Float32], batchLabels: Tensor1[Batch, Int32])(
       params: MNistCNN.Params
-  ): Tensor0[Float] =
+  ): Tensor0[Float32] =
     val model = MNistCNN(params)
     val batchLosses = zipvmap(Axis[Batch])(batchImages, batchLabels):
       case (img, target) =>
         CategoricalCrossEntropy.fromLogits(target, model.logits(img))
     batchLosses.mean
 
-  def costFnFor[S: Label](images: Tensor3[S, Height, Width, Float], labels: Tensor1[S, Int])(params: MNistCNN.Params): Tensor0[Float] =
+  def costFnFor[S: Label](images: Tensor3[S, Height, Width, Float32], labels: Tensor1[S, Int32])(params: MNistCNN.Params): Tensor0[Float32] =
     val model = MNistCNN(params)
     zipvmap(Axis[S])(images, labels): (image, label) =>
       val logits = model.logits(image)
@@ -67,11 +67,11 @@ def mnistCNNTrain(): Unit =
       jitGradientStep(batch, state)
 
   // Evaluation
-  def evaluate[S: Label](params: MNistCNN.Params, dataX: Tensor[(S, Height, Width), Float], dataY: Tensor1[S, Int]): Tensor0[Float] =
+  def evaluate[S: Label](params: MNistCNN.Params, dataX: Tensor[(S, Height, Width), Float32], dataY: Tensor1[S, Int32]): Tensor0[Float32] =
     val model = MNistCNN(params)
     val predictions = dataX.vmap(Axis[S])(model)
     val matches = zipvmap(Axis[S])(predictions, dataY)(_ === _)
-    matches.asFloat.mean
+    matches.asFloat32.mean
 
   val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
   val logger = new TenZarrLogger(f"out/MNistCNN/$time")

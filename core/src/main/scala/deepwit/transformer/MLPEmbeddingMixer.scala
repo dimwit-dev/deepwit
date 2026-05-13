@@ -4,16 +4,14 @@ import dimwit.*
 import deepwit.base.ActivationFunction.gelu
 import deepwit.base.AffineLayer
 
-case class MLPEmbeddingMixer[Embedding: Label](
-    hyperParams: MLPEmbeddingMixer.HyperParams[Embedding]
-)(
-    params: MLPEmbeddingMixer.Params[Embedding]
-) extends (Tensor1[Embedding, Float] => Tensor1[Embedding, Float]):
+case class MLPEmbeddingMixer[Embedding: Label, V: IsFloating](
+    params: MLPEmbeddingMixer.Params[Embedding, V]
+) extends (Tensor1[Embedding, V] => Tensor1[Embedding, V]):
 
   private val hiddenLayer = AffineLayer(params.expand)
   private val outputLayer = AffineLayer(params.project)
 
-  override def apply(in: Tensor1[Embedding, Float]): Tensor1[Embedding, Float] =
+  override def apply(in: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
     val hidden = gelu(hiddenLayer(in))
     outputLayer(hidden)
 
@@ -21,27 +19,23 @@ object MLPEmbeddingMixer:
 
   trait EmbeddingMixed derives Label
 
-  case class HyperParams[Embedding](
-      activationFunction: Tensor[Tuple1[Embedding], Float] => Tensor[Tuple1[Embedding], Float]
-  )
-
-  case class Params[Embedding](
-      expand: AffineLayer.Params[Embedding, EmbeddingMixed],
-      project: AffineLayer.Params[EmbeddingMixed, Embedding]
+  case class Params[Embedding, V](
+      expand: AffineLayer.Params[Embedding, EmbeddingMixed, V],
+      project: AffineLayer.Params[EmbeddingMixed, Embedding, V]
   )
 
   object Params:
 
-    def xavierNormal[Embedding: Label](embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[EmbeddingMixed], key: Random.Key): Params[Embedding] =
+    def xavierNormal[Embedding: Label, V: IsFloating](embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       val (fcKey, projKey) = key.splitToTuple(2)
       Params(
-        expand = AffineLayer.Params.xavierNormal(embeddingExtent, embeddingMixedExtent, fcKey),
-        project = AffineLayer.Params.xavierNormal(embeddingMixedExtent, embeddingExtent, projKey)
+        expand = AffineLayer.Params.xavierNormal(embeddingExtent, embeddingMixedExtent, vtype, fcKey),
+        project = AffineLayer.Params.xavierNormal(embeddingMixedExtent, embeddingExtent, vtype, projKey)
       )
 
-    def xavierUniform[Embedding: Label](embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[EmbeddingMixed], key: Random.Key): Params[Embedding] =
+    def xavierUniform[Embedding: Label, V: IsFloating](embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       val (fcKey, projKey) = key.splitToTuple(2)
       Params(
-        expand = AffineLayer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, fcKey),
-        project = AffineLayer.Params.xavierUniform(embeddingMixedExtent, embeddingExtent, projKey)
+        expand = AffineLayer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, vtype, fcKey),
+        project = AffineLayer.Params.xavierUniform(embeddingMixedExtent, embeddingExtent, vtype, projKey)
       )

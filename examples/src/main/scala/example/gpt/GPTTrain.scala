@@ -1,6 +1,7 @@
 package example.gpt
 
 import dimwit.*
+import dimwit.tensor.DType.Float16
 import dimwit.jax.Jax
 import dimwit.Conversions.given
 import deepwit.*
@@ -11,6 +12,7 @@ import nn.AdamW
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
 import dimwit.stats.Uniform
 import dimwit.hardware.DeviceBackend.{CPU, GPU}
+import dimwit.FloatTree.ops.asFloats
 import me.shadaj.scalapy.py
 
 object Config:
@@ -50,8 +52,8 @@ object DebugConfig:
 import DebugConfig.*
 
 case class BatchSample(
-    targets: Tensor2[Sample, Context, Int],
-    shiftedTargets: Tensor2[Sample, Context, Int]
+    targets: Tensor2[Sample, Context, Int32],
+    shiftedTargets: Tensor2[Sample, Context, Int32]
 )
 
 @main def train(): Unit =
@@ -69,17 +71,15 @@ case class BatchSample(
     headValueExtent,
     embeddingExtent,
     embeddingMixedExtent,
+    VType[Float32],
     initParamsKey
   )
 
   val hyperParams = GPT.HyperParams(
     Transformer.HyperParams(
-      TransformerLayer.HyperParams(MLPEmbeddingMixer.HyperParams(activationFunction = gelu)),
       LayerNorm.HyperParams(1e-12)
     )
   )
-
-  val GPTModel = GPT(hyperParams)
 
   val adamW = AdamW(
     Adam(learningRate = learningRate, b1 = beta1, b2 = beta2),
@@ -87,19 +87,19 @@ case class BatchSample(
   )
 
   case class TrainingState(
-      params: GPT.Params,
-      adamWState: adamW.State[GPT.Params],
-      stepCost: Tensor0[Float]
+      params: GPT.Params[Float32],
+      adamWState: adamW.State[GPT.Params[Float32]],
+      stepCost: Tensor0[Float32]
   )
 
-  def loadData(binaryPath: String): Tensor1[Sample, Int] =
+  def loadData(binaryPath: String): Tensor1[Sample, Int32] =
     lazy val np = py.module("numpy")
     liftPyTensor(Jax.jnp.asarray(
       np.memmap(binaryPath, dtype = np.uint16, mode = "r"),
       device = CPU.devices.head.toJaxDevice
     ))
 
-  def loadBatch(data: Tensor1[Sample, Int], batchSize: Int, key: Random.Key): BatchSample =
+  def loadBatch(data: Tensor1[Sample, Int32], batchSize: Int, key: Random.Key): BatchSample =
     val maxIdx = data.shape(Axis[Sample]) - batchSize - 1
     val randomIndices = IndependentDistribution.fromUnivariate(
       Shape1(Axis[Sample] -> batchSize),
@@ -115,7 +115,7 @@ case class BatchSample(
     val gpu = GPU.devices.head
     BatchSample(targets.toDevice(gpu), shiftedTargets.toDevice(gpu))
 
-  def batchStream(data: Tensor1[Sample, Int], batchSize: Int, initialKey: Random.Key): LazyList[BatchSample] =
+  def batchStream(data: Tensor1[Sample, Int32], batchSize: Int, initialKey: Random.Key): LazyList[BatchSample] =
     val stateStream = LazyList.iterate((loadBatch(data, batchSize, initialKey), initialKey)):
       case (_, prevKey) =>
         val (nowKey, nextKey) = prevKey.split2()
@@ -125,35 +125,37 @@ case class BatchSample(
   val (trainKey, valKey) = dataKey.split2()
   val trainStream = batchStream(loadData("data/openwebtext/val.bin"), batchSize, trainKey)
 
-  def loss(
-      targets: Tensor1[Context, Int],
-      logits: Tensor2[Context, Vocab, Float]
-  ): Tensor0[Float] =
+  def loss[V: IsFloating](
+      targets: Tensor1[Context, Int32],
+      logits: Tensor2[Context, Vocab, V]
+  ): Tensor0[V] =
     zipvmap(Axis[Context])(targets, logits)(CategoricalCrossEntropy.fromLogits).mean
 
-  def costFunFor(
+  def costFunFor[V: IsFloating](
       batchSample: BatchSample
   )(
-      params: GPT.Params
-  ): Tensor0[Float] =
-    val model = GPTModel(params)
+      params: GPT.Params[V]
+  ): Tensor0[V] =
+    val model = GPT(hyperParams)(params)
     val losses = zipvmap(Axis[Sample])(batchSample.targets, batchSample.shiftedTargets):
       case (targets, shiftedTargets) =>
         val logits = model.logits(shiftedTargets)
         loss(targets, logits)
     losses.mean
 
-  def gradientStep(
+  def gradientStep[V: IsFloating](
       batchSample: BatchSample,
       state: TrainingState
   ): TrainingState =
-    val costFn = costFunFor(batchSample)
-    val grads = Autodiff.grad(costFn)(state.params)
-    val stepCost = costFn(state.params) // TODO move to gradAndValue
-    val (params, adamWState) = adamW.update(grads, state.params, state.adamWState)
-    TrainingState(params, adamWState, stepCost)
+    val costFn = costFunFor[Float16](batchSample)
+    val paramsF16 = state.params.asFloats(VType[Float16])
+    val (stepCost, grads) = Autodiff.valueAndGrad(costFn)(paramsF16)
+    val grads2 = grads.asInstanceOf[GPT.Params[Float16]]
+    val gradsF32 = Grad.asFloats(grads)(VType[Float32])
+    val (params, adamWState) = adamW.update(gradsF32, state.params, state.adamWState)
+    TrainingState(params, adamWState, stepCost.asFloat32)
 
-  val jitGradientStep = jitDonatingUnsafe(gradientStep)
+  val jitGradientStep = jitDonatingUnsafe(gradientStep[Float32])
 
   def miniBatchGradientDescent(
       samples: LazyList[BatchSample],

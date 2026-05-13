@@ -7,23 +7,23 @@ import dimwit.stats.Normal
 import deepwit.base.{AffineLayer, LinearLayer}
 import deepwit.init
 
-case class MultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label](
+case class MultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label, V: IsFloating](
     hyperParams: MultiHeadCrossAttention.HyperParams[CrossContext, Context]
 )(
-    params: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding]
-) extends ((Tensor2[CrossContext, CrossEmbedding, Float], Tensor2[Context, Embedding, Float]) => Tensor2[Context, Embedding, Float]):
+    params: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding, V]
+) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
 
-  override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]): Tensor2[Context, Embedding, Float] =
+  override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     val heads = headAttention(crossContext, context)
     heads.vmap(Axis[Context])(heads => headProjection(heads.flatten))
 
-  protected def headAttention(crossContext: Tensor2[CrossContext, CrossEmbedding, Float], context: Tensor2[Context, Embedding, Float]) =
+  protected def headAttention(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]) =
     zipvmap(Axis[Head])(params.wq, params.wk, params.wv):
       case (wq, wk, wv) =>
         val headAttention = CrossAttention(hyperParams.headAttention)(CrossAttention.BaseParams(wq, wk, wv))
         headAttention(crossContext, context)
 
-  protected def headProjection(headValues: Tensor1[Head |*| HeadValue, Float]) = AffineLayer(params.headProjection)(headValues)
+  protected def headProjection(headValues: Tensor1[Head |*| HeadValue, V]) = AffineLayer(params.headProjection)(headValues)
 
 object MultiHeadCrossAttention:
 
@@ -31,22 +31,22 @@ object MultiHeadCrossAttention:
       val headAttention: CrossAttention.HyperParams[CrossContext, Context]
   )
 
-  case class Params[CrossEmbedding, Embedding](
-      wq: Tensor3[Head, Embedding, HeadQuery, Float],
-      wk: Tensor3[Head, CrossEmbedding, HeadKey, Float],
-      wv: Tensor3[Head, CrossEmbedding, HeadValue, Float],
-      headProjection: AffineLayer.Params[Head |*| HeadValue, Embedding]
+  case class Params[CrossEmbedding, Embedding, V: IsFloating](
+      wq: Tensor3[Head, Embedding, HeadQuery, V],
+      wk: Tensor3[Head, CrossEmbedding, HeadKey, V],
+      wv: Tensor3[Head, CrossEmbedding, HeadValue, V],
+      headProjection: AffineLayer.Params[Head |*| HeadValue, Embedding, V]
   )
 
   object Params:
 
-    def xavierUniformDepthScaled[CrossEmbedding: Label, Embedding: Label](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], key: Random.Key): Params[CrossEmbedding, Embedding] =
+    def xavierUniformDepthScaled[CrossEmbedding: Label, Embedding: Label, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
       val nHeads = headExtent.size
       val headProjectionGain = Math.sqrt(1.0 / (2 * numTransformerLayers)).toFloat
       Params(
-        wq = stack(queryKey.split(nHeads).map(key => init.xavierUniform(embeddingExtent, headQueryExtent, key)), Axis[Head]),
-        wk = stack(keyKey.split(nHeads).map(key => init.xavierUniform(crossEmbeddingExtent, headKeyExtent, key)), Axis[Head]),
-        wv = stack(valueKey.split(nHeads).map(key => init.xavierUniform(crossEmbeddingExtent, headValueExtent, key)), Axis[Head]),
-        headProjection = AffineLayer.Params.xavierUniform(headExtent * headValueExtent, embeddingExtent, projectionKey, gain = headProjectionGain)
+        wq = stack(queryKey.split(nHeads).map(key => init.xavierUniform(embeddingExtent, headQueryExtent, vtype, key)), Axis[Head]),
+        wk = stack(keyKey.split(nHeads).map(key => init.xavierUniform(crossEmbeddingExtent, headKeyExtent, vtype, key)), Axis[Head]),
+        wv = stack(valueKey.split(nHeads).map(key => init.xavierUniform(crossEmbeddingExtent, headValueExtent, vtype, key)), Axis[Head]),
+        headProjection = AffineLayer.Params.xavierUniform(headExtent * headValueExtent, embeddingExtent, vtype, projectionKey, gain = headProjectionGain)
       )

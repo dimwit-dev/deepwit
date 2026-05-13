@@ -20,7 +20,7 @@ import deepwit.logging.TenZarrLogger
 
 private trait Batch derives Label
 
-case class TrainState(params: Autoencoder.Params, lastCost: Tensor0[Float])
+case class TrainState(params: Autoencoder.Params, lastCost: Tensor0[Float32])
 
 @main
 def autoEncoderTraining(): Unit =
@@ -44,7 +44,7 @@ def autoEncoderTraining(): Unit =
 
   val trainDataStream = trainDataset.toBatchStream(Axis[Batch] -> batchSize).map(_.images)
 
-  def costFnFor[S: Label](samples: Tensor3[S, Height, Width, Float])(params: Autoencoder.Params): Tensor0[Float] =
+  def costFnFor[S: Label](samples: Tensor3[S, Height, Width, Float32])(params: Autoencoder.Params): Tensor0[Float32] =
     val model = Autoencoder(params)
     samples
       .vmap(Axis[S]): sample =>
@@ -56,7 +56,7 @@ def autoEncoderTraining(): Unit =
 
   val optimizer = GradientDescent(learningRate = Tensor0(learningRate))
 
-  def gradientStep(batch: Tensor3[Batch, Height, Width, Float], state: TrainState): TrainState =
+  def gradientStep(batch: Tensor3[Batch, Height, Width, Float32], state: TrainState): TrainState =
     val grads = Autodiff.grad(costFnFor(batch))(state.params)
     val cost = costFnFor(batch)(state.params)
     val (newParams, _) = optimizer.update(grads, state.params, ())

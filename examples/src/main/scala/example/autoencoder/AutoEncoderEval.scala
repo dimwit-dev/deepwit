@@ -11,7 +11,7 @@ import dimwit.python.PyBridge.toPyTensor
 import me.shadaj.scalapy.py
 import me.shadaj.scalapy.py.SeqConverters
 
-def toImg2D(tensor: Tensor[(TestSample, Height, Width), Float]): Tensor[(Prime[Height] |*| Height, Prime[Width] |*| Width), Float] =
+def toImg2D(tensor: Tensor[(TestSample, Height, Width), Float32]): Tensor[(Prime[Height] |*| Height, Prime[Width] |*| Width), Float32] =
   tensor
     .relabel(Axis[TestSample].as(Axis[Prime[Height] |*| Prime[Width]]))
     .rearrange(

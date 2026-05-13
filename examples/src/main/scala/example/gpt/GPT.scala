@@ -5,24 +5,24 @@ import nn.ActivationFunctions.softmax
 import deepwit.*
 import deepwit.labels.{Head, HeadKey, HeadQuery, HeadValue}
 
-case class GPT(hyperParams: GPT.HyperParams)(params: GPT.Params):
+case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V]):
 
   private val embedder = VocabularyEmbedder(params.embedderParams)
   private val positionalInjector = LearnedAbsolutePositionalInjector(params.positionalInjectorParams)
   private val causalTransformer = CausalTransformer(hyperParams.transformer)(params.transformer)
   private val outputProjection = LinearLayer(params.outputProjection)
 
-  def logits(tokenContext: Tensor1[Context, Int]): Tensor2[Context, Vocab, Float] =
+  def logits(tokenContext: Tensor1[Context, Int32]): Tensor2[Context, Vocab, V] =
     val embeddingContext = tokenContext.vmap(Axis[Context])(embedder)
     val sequentialContext = positionalInjector(embeddingContext)
     val mixedContext = causalTransformer(sequentialContext)
     mixedContext.vmap(Axis[Context])(outputProjection)
 
-  def probits(tokenContext: Tensor1[Context, Int]): Tensor2[Context, Vocab, Float] =
+  def probits(tokenContext: Tensor1[Context, Int32]): Tensor2[Context, Vocab, V] =
     logits(tokenContext)
       .vapply(Axis[Vocab])(softmax)
 
-  def apply(tokenContext: Tensor1[Context, Int]): Tensor1[Context, Int] =
+  def apply(tokenContext: Tensor1[Context, Int32]): Tensor1[Context, Int32] =
     logits(tokenContext)
       .argmax(Axis[Vocab])
 
@@ -34,16 +34,16 @@ object GPT:
       transformer: Transformer.HyperParams[Context, Embedding]
   )
 
-  case class Params(
-      embedderParams: VocabularyEmbedder.Params[Vocab, Embedding],
-      positionalInjectorParams: LearnedAbsolutePositionalInjector.Params[Context, Embedding],
-      transformer: Transformer.Params[Embedding],
-      outputProjection: LinearLayer.Params[Embedding, Vocab]
+  case class Params[V](
+      embedderParams: VocabularyEmbedder.Params[Vocab, Embedding, V],
+      positionalInjectorParams: LearnedAbsolutePositionalInjector.Params[Context, Embedding, V],
+      transformer: Transformer.Params[Embedding, V],
+      outputProjection: LinearLayer.Params[Embedding, Vocab, V]
   )
 
   object Params:
 
-    def init(numTransformerLayers: Int)(
+    def init[V: IsFloating](numTransformerLayers: Int)(
         vocabExtent: AxisExtent[Vocab],
         contextExtent: AxisExtent[Context],
         headExtent: AxisExtent[Head],
@@ -52,13 +52,14 @@ object GPT:
         headValueExtent: AxisExtent[HeadValue],
         embeddingExtent: AxisExtent[Embedding],
         embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed],
+        vtype: VType[V],
         key: Random.Key
-    ): Params =
+    ): Params[V] =
       val (vocabEmbeddingKey, positionalEmbeddingKey, transformerKey, outputProjectionKey) = key.splitToTuple(4)
 
       Params(
-        embedderParams = VocabularyEmbedder.Params.lecunUniform(vocabExtent, embeddingExtent, vocabEmbeddingKey),
-        positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, positionalEmbeddingKey),
+        embedderParams = VocabularyEmbedder.Params.lecunUniform(vocabExtent, embeddingExtent, vtype, vocabEmbeddingKey),
+        positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, vtype, positionalEmbeddingKey),
         transformer = Transformer.Params.xavierUniformDepthScaled(numTransformerLayers)(
           headExtent = headExtent,
           headQueryExtent = headQueryExtent,
@@ -66,7 +67,8 @@ object GPT:
           headValueExtent = headValueExtent,
           embeddingExtent = embeddingExtent,
           embeddingMixedExtent = embeddingMixedExtent,
+          vtype = vtype,
           key = transformerKey
         ),
-        outputProjection = LinearLayer.Params.xavierUniform(embeddingExtent, vocabExtent, outputProjectionKey)
+        outputProjection = LinearLayer.Params.xavierUniform(embeddingExtent, vocabExtent, vtype, outputProjectionKey)
       )

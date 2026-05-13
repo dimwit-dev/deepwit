@@ -24,13 +24,14 @@ class TenZarrLogger(storePath: String):
     ???
 
   def logTensorTree[Data: TensorTree](name: String, iteration: Int, data: Data): Unit =
-    TensorTree.foreach(
+    ???
+    /*TensorTree.foreach(
       data,
       [T <: Tuple, V] =>
         (labels: Labels[T]) ?=>
           (tensorName: String, tensor: Tensor[T, V]) =>
             logTensor(s"$name/$iteration/$tensorName", tensor)
-    )
+    )*/
 
   def logTensor[T <: Tuple, V](name: String, data: Tensor[T, V]): Unit =
     assert(!root.__contains__(name).as[Boolean])
@@ -49,6 +50,8 @@ class TenZarrLogger(storePath: String):
   def loadTensorTree[Data: TensorTree](name: String, iteration: Int): Option[Data] =
     val iterationPath = s"$name/$iteration"
     Option.when(root.__contains__(iterationPath).as[Boolean]):
+      ???
+      /*
       TensorTree[Data].fill([T <: Tuple, V] =>
         (labels: Labels[T]) ?=>
           (tensorName: String) =>
@@ -58,14 +61,15 @@ class TenZarrLogger(storePath: String):
               if shape.isEmpty then zarrArray.bracketAccess(me.shadaj.scalapy.py.Dynamic.global.Ellipsis)
               else zarrArray.bracketAccess(py.Dynamic.global.slice(py.None))
             liftPyTensor[T, V](pyTensor)
-      )
+      )*/
 
   def loadTree[Data: TensorTree](name: String, iteration: Int): Option[Data] =
     Option.when(root.as[py.Dynamic].__contains__(name).as[Boolean]):
       val pyData = root.bracketAccess(name)
-      TensorTree[Data].fill([T <: Tuple, V] =>
+      ???
+      /*TensorTree[Data].fill([T <: Tuple, V] =>
         (labels: Labels[T]) ?=>
           (path: String) =>
             val raw = pyData.bracketAccess(path).bracketAccess("values").bracketAccess(iteration)
             liftPyTensor[T, V](raw)
-      )
+      )*/

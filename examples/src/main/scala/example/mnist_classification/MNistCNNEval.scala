@@ -28,8 +28,8 @@ def mnistCNNEval(checkpointPath: String) =
 
   // 2. State Management
   var currentModel: MNistCNN = null
-  var allLogits: Tensor[(TestSample, Output), Float] = null
-  var allPredictions: Tensor1[TestSample, Int] = null
+  var allLogits: Tensor[(TestSample, Output), Float32] = null
+  var allPredictions: Tensor1[TestSample, Int32] = null
   var sortedIndices: Seq[Int] = Nil
   var randomIndices: Seq[Int] = scala.util.Random.shuffle(0 until testDataset.images.shape(Axis[TestSample]))
   var accuracy: Float = 0f
@@ -54,7 +54,7 @@ def mnistCNNEval(checkpointPath: String) =
 
     // Calculate Accuracy
     val matches = zipvmap(Axis[TestSample])(allPredictions, testDataset.labels)(_ === _)
-    accuracy = matches.asFloat.mean.item * 100f
+    accuracy = matches.asFloat32.mean.item * 100f
 
     // Sort by Loss for "Worst" mistakes
     val losses = zipvmap(Axis[TestSample])(testDataset.labels, allLogits): (target, logits) =>
@@ -150,7 +150,7 @@ def mnistCNNEval(checkpointPath: String) =
   updateIteration(iterations.max)
   plt.show()
 
-def toImg2D_Small(tensor: Tensor[(TestSample, Height, Width), Float]): Tensor[(Prime[Height] |*| Height, Prime[Width] |*| Width), Float] =
+def toImg2D_Small(tensor: Tensor[(TestSample, Height, Width), Float32]): Tensor[(Prime[Height] |*| Height, Prime[Width] |*| Width), Float32] =
   tensor.relabel(Axis[TestSample] -> Axis[Prime[Height] |*| Prime[Width]])
     .rearrange(
       (Axis[Prime[Height] |*| Height], Axis[Prime[Width] |*| Width]),
