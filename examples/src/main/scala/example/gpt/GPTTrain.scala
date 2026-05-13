@@ -1,3 +1,8 @@
+/** TODO
+  * - GradScaler and BFloat16 support
+  * - Increase batch size (gradient accumulation)
+  */
+
 package example.gpt
 
 import dimwit.*
@@ -49,11 +54,15 @@ object DebugConfig:
   val headValueExtent = Axis[HeadValue] -> 32
   val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 512
 
-import DebugConfig.*
+import Config.*
+
+// TODO make this work and add GradScaler
+// import dimwit.tensor.DType
+// given ExecutionType[Float] = ExecutionTypeFor[Float](DType.BFloat16)
 
 case class BatchSample(
     targets: Tensor2[Sample, Context, Int32],
-    shiftedTargets: Tensor2[Sample, Context, Int32]
+    inputs: Tensor2[Sample, Context, Int32]
 )
 
 @main def train(): Unit =
@@ -106,14 +115,14 @@ case class BatchSample(
       Uniform(Tensor0(0), Tensor0(maxIdx))
     ).sample(key)
     val shiftedIndices = randomIndices +! 1
-    val targets = randomIndices.vmap(Axis[Sample])(startIndex =>
+    val inputs = randomIndices.vmap(Axis[Sample])(startIndex =>
       data.dynamicSlice(startIndex, contextExtent.size).relabelTo(Axis[Context])
     )
-    val shiftedTargets = shiftedIndices.vmap(Axis[Sample])(startIndex =>
+    val targets = shiftedIndices.vmap(Axis[Sample])(startIndex =>
       data.dynamicSlice(startIndex, contextExtent.size).relabelTo(Axis[Context])
     )
     val gpu = GPU.devices.head
-    BatchSample(targets.toDevice(gpu), shiftedTargets.toDevice(gpu))
+    BatchSample(targets.toDevice(gpu), inputs.toDevice(gpu))
 
   def batchStream(data: Tensor1[Sample, Int32], batchSize: Int, initialKey: Random.Key): LazyList[BatchSample] =
     val stateStream = LazyList.iterate((loadBatch(data, batchSize, initialKey), initialKey)):
@@ -123,7 +132,7 @@ case class BatchSample(
     stateStream.map(_._1)
 
   val (trainKey, valKey) = dataKey.split2()
-  val trainStream = batchStream(loadData("data/openwebtext/val.bin"), batchSize, trainKey)
+  val trainStream = batchStream(loadData("data/openwebtext/train.bin"), batchSize, trainKey)
 
   def loss[V: IsFloating](
       targets: Tensor1[Context, Int32],
@@ -137,9 +146,9 @@ case class BatchSample(
       params: GPT.Params[V]
   ): Tensor0[V] =
     val model = GPT(hyperParams)(params)
-    val losses = zipvmap(Axis[Sample])(batchSample.targets, batchSample.shiftedTargets):
-      case (targets, shiftedTargets) =>
-        val logits = model.logits(shiftedTargets)
+    val losses = zipvmap(Axis[Sample])(batchSample.targets, batchSample.inputs):
+      case (targets, inputs) =>
+        val logits = model.logits(inputs)
         loss(targets, logits)
     losses.mean
 
