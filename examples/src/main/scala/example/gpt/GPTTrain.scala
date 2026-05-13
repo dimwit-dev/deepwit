@@ -1,6 +1,7 @@
-/** TODO
-  * - GradScaler and BFloat16 support
-  * - Increase batch size (gradient accumulation)
+/** - Increase batch size (gradient accumulation)
+  * - Learning rate warmup and decay
+  * - Evaluation on validation set
+  * - Checkpointing
   */
 
 package example.gpt
@@ -17,14 +18,23 @@ import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
 import dimwit.stats.Uniform
 import dimwit.hardware.DeviceBackend.{CPU, GPU}
 import dimwit.FloatTree.ops.asFloats
+import dimwit.FloatTree.ops.++
+import dimwit.FloatTree.map
 import me.shadaj.scalapy.py
 
+import java.io.{FileWriter, PrintWriter, File}
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 object Config:
-  val batchSize = 64
-  val learningRate = 1e-4f
+  val runningBatchSize = 32
+  val effectiveBatchSize = 480
+  val accumulationSteps = 1 // effectiveBatchSize / runningBatchSize
+  val learningRate = 6e-4f
   val beta1 = 0.9f
-  val beta2 = 0.99f
-  val weightDecayFactor = 0.01f
+  val beta2 = 0.95f
+  val gradientClipNorm: Float = 1.0f
+  val weightDecayFactor = 0.1f
 
   val numLayers = 12
   val vocabExtent = Axis[Vocab] -> 50257
@@ -37,7 +47,7 @@ object Config:
   val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 3072
 
 object DebugConfig:
-  val batchSize = 1
+  val runningBatchSize = 1
   val learningRate = 1e-4f
   val beta1 = 0.9f
   val beta2 = 0.99f
@@ -59,6 +69,19 @@ case class BatchSample(
     targets: Tensor2[Sample, Context, Int32],
     inputs: Tensor2[Sample, Context, Int32]
 )
+
+trait Accumulation derives Label
+
+case class BatchAccumulationSample(
+    targets: Tensor3[Accumulation, Sample, Context, Int32],
+    inputs: Tensor3[Accumulation, Sample, Context, Int32]
+)
+
+object BatchAccumulationSample:
+  def apply(batchSamples: Seq[BatchSample]): BatchAccumulationSample =
+    val targets = stack(batchSamples.map(_.targets), Axis[Accumulation])
+    val inputs = stack(batchSamples.map(_.inputs), Axis[Accumulation])
+    BatchAccumulationSample(targets, inputs)
 
 @main def train(): Unit =
 
@@ -129,7 +152,7 @@ case class BatchSample(
     stateStream.map(_._1)
 
   val (trainKey, valKey) = dataKey.split2()
-  val trainStream = batchStream(loadData("data/openwebtext/train.bin"), batchSize, trainKey)
+  val trainStream = batchStream(loadData("data/openwebtext/train.bin"), runningBatchSize, trainKey)
 
   def loss[V: IsFloating](
       targets: Tensor1[Context, Int32],
@@ -149,46 +172,88 @@ case class BatchSample(
         loss(targets, logits)
     losses.mean
 
-  def gradientStep[V: IsFloating](
+  def calcGradients(
       batchSample: BatchSample,
+      params: GPT.Params[BFloat16]
+  ): (Tensor0[BFloat16], Grad[GPT.Params[BFloat16]]) =
+    val costFn = costFunFor[BFloat16](batchSample)
+    Autodiff.valueAndGrad(costFn)(params)
+  val jitCalcGradients = jit(calcGradients)
+  val jitAdamWUpdate = jitDonatingUnsafe(adamW.update[GPT.Params[Float32]])
+
+  def gradientDescentStep(
+      runningBatchSamples: BatchAccumulationSample,
       state: TrainingState
   ): TrainingState =
-    val costFn = costFunFor[BFloat16](batchSample)
-    val paramsF16 = state.params.asFloats(VType[BFloat16])
-    val (stepCost, grads) = Autodiff.valueAndGrad(costFn)(paramsF16)
-    val gradsF32 = Grad.asFloats(grads)(VType[Float32])
-    val (params, adamWState) = adamW.update(gradsF32, state.params, state.adamWState)
-    TrainingState(params, adamWState, stepCost.asFloat32)
 
-  val jitGradientStep = jitDonatingUnsafe(gradientStep[Float32])
+    val paramsF16 = state.params.asFloats(VType[BFloat16])
+    val initialGrads = state.params.map([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, Float32]) => Tensor.like(x).fill(0f))
+
+    def f(accGrads: GPT.Params[Float32], sample: BatchSample): GPT.Params[Float32] =
+      val (cost, grads) = calcGradients(sample, paramsF16)
+      accGrads ++ grads.asFloats(VType[Float32])
+    def scan[A](f: (A, BatchSample) => A, init: A, data: BatchAccumulationSample)(using
+        aTree: TensorTree[A],
+        basTree: TensorTree[BatchAccumulationSample],
+        bsTree: TensorTree[BatchSample]
+    ): A =
+      import me.shadaj.scalapy.py.SeqConverters
+      val fpy = (acc: Jax.PyDynamic, next: Jax.PyDynamic) =>
+        OnError.traceStack:
+          val pyNext = bsTree.fromPyTree(next)
+          val pyAcc = aTree.fromPyTree(acc)
+          val result = f(pyAcc, pyNext)
+          py.Dynamic.global.tuple(aTree.toPyTree(result), py.None)
+      val pyData = basTree.toPyTree(data)
+      val res = Jax.jax_helper.scan(fpy, aTree.toPyTree(init), pyData) // This line causes the error!
+      aTree.fromPyTree(res.bracketAccess(0))
+
+    val accumulatedGrads = scan(f, initialGrads, runningBatchSamples)
+
+    // val (params, adamWState) = adamW.update(Grad(accumulatedGrads), state.params, state.adamWState)
+    val (params, adamWState) = jitAdamWUpdate(Grad(accumulatedGrads), state.params, state.adamWState)
+    TrainingState(params, adamWState, Tensor0(0f))
+  // val jitGradientDescentStep = dimwit.eagerCleanup(gradientDescentStep)
+  val jitGradientDescentStep = gradientDescentStep
 
   def miniBatchGradientDescent(
       samples: LazyList[BatchSample],
       startState: TrainingState
   ): LazyList[TrainingState] =
-    samples.scanLeft(startState):
-      case (state, sample) =>
-        dimwit.gc()
-        jitGradientStep(sample, state)
+    samples
+      .grouped(accumulationSteps).map(x => BatchAccumulationSample(x)).to(LazyList)
+      .scanLeft(startState):
+        case (state, runningBatchSamples) =>
+          dimwit.gc()
+          jitGradientDescentStep(runningBatchSamples, state)
 
   val initState = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
   val trainTrajectory = miniBatchGradientDescent(trainStream, initState)
+
+  // Initialize CSV File
+  val csvFile = new File(s"training_log_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}.csv")
+  val writer = new PrintWriter(new FileWriter(csvFile, true))
+
+  val headers = List("timestamp", "iter", "samples_per_s", "s_per_batch", "step_cost")
+  writer.println(headers.mkString(","))
+
   val timer = Timer.start()
   println("Training...")
   val finalState = trainTrajectory
     .drop(1)
-    .tapEvery(1):
+    .tapEvery(10):
       case (state, iter) =>
         // Training report
         timer.tick()
         val secondsPerBatch = timer.runningAvgSeconds
-        println(
-          List(
-            s"iter $iter",
-            f"samples/s: ${batchSize / (secondsPerBatch)}%.2f",
-            f"s/batch: $secondsPerBatch%.2f",
-            f"stepCost ${state.stepCost.item}%.2f"
-          ).mkString(", ")
+        val logData = Map(
+          "timestamp" -> java.time.Instant.now().toString,
+          "iter" -> iter,
+          "samples_per_s" -> f"${effectiveBatchSize / (secondsPerBatch)}%.2f",
+          "s_per_batch" -> f"$secondsPerBatch%.2f",
+          "step_cost" -> f"${state.stepCost.item}%.2f"
         )
+        writer.println(headers.map(h => logData(h)).mkString(","))
+        println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
     .drop(1_000_000_000)
     .head
