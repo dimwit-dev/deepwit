@@ -6,7 +6,6 @@
 package example.gpt
 
 import dimwit.*
-import dimwit.tensor.DType.Float16
 import dimwit.jax.Jax
 import dimwit.Conversions.given
 import deepwit.*
@@ -56,16 +55,15 @@ object DebugConfig:
 
 import Config.*
 
-// TODO make this work and add GradScaler
-// import dimwit.tensor.DType
-// given ExecutionType[Float] = ExecutionTypeFor[Float](DType.BFloat16)
-
 case class BatchSample(
     targets: Tensor2[Sample, Context, Int32],
     inputs: Tensor2[Sample, Context, Int32]
 )
 
 @main def train(): Unit =
+
+  /** Helper-Type to mark np.memmap tensor */
+  type LazyTensor1[L, V] = Tensor1[L, V]
 
   val key = Random.Key.fromTime()
 
@@ -101,14 +99,13 @@ case class BatchSample(
       stepCost: Tensor0[Float32]
   )
 
-  def loadData(binaryPath: String): Tensor1[Sample, Int32] =
+  def loadData(binaryPath: String): LazyTensor1[Sample, UInt16] =
     lazy val np = py.module("numpy")
-    liftPyTensor(Jax.jnp.asarray(
-      np.memmap(binaryPath, dtype = np.uint16, mode = "r"),
-      device = CPU.devices.head.toJaxDevice
-    ))
+    liftPyTensor(
+      np.memmap(binaryPath, dtype = np.uint16, mode = "r")
+    )
 
-  def loadBatch(data: Tensor1[Sample, Int32], batchSize: Int, key: Random.Key): BatchSample =
+  def loadBatch(data: LazyTensor1[Sample, UInt16], batchSize: Int, key: Random.Key): BatchSample =
     val maxIdx = data.shape(Axis[Sample]) - batchSize - 1
     val randomIndices = IndependentDistribution.fromUnivariate(
       Shape1(Axis[Sample] -> batchSize),
@@ -122,9 +119,9 @@ case class BatchSample(
       data.dynamicSlice(startIndex, contextExtent.size).relabelTo(Axis[Context])
     )
     val gpu = GPU.devices.head
-    BatchSample(targets.toDevice(gpu), inputs.toDevice(gpu))
+    BatchSample(targets.asInt32.toDevice(gpu), inputs.asInt32.toDevice(gpu))
 
-  def batchStream(data: Tensor1[Sample, Int32], batchSize: Int, initialKey: Random.Key): LazyList[BatchSample] =
+  def batchStream(data: Tensor1[Sample, UInt16], batchSize: Int, initialKey: Random.Key): LazyList[BatchSample] =
     val stateStream = LazyList.iterate((loadBatch(data, batchSize, initialKey), initialKey)):
       case (_, prevKey) =>
         val (nowKey, nextKey) = prevKey.split2()
@@ -156,10 +153,9 @@ case class BatchSample(
       batchSample: BatchSample,
       state: TrainingState
   ): TrainingState =
-    val costFn = costFunFor[Float16](batchSample)
-    val paramsF16 = state.params.asFloats(VType[Float16])
+    val costFn = costFunFor[BFloat16](batchSample)
+    val paramsF16 = state.params.asFloats(VType[BFloat16])
     val (stepCost, grads) = Autodiff.valueAndGrad(costFn)(paramsF16)
-    val grads2 = grads.asInstanceOf[GPT.Params[Float16]]
     val gradsF32 = Grad.asFloats(grads)(VType[Float32])
     val (params, adamWState) = adamW.update(gradsF32, state.params, state.adamWState)
     TrainingState(params, adamWState, stepCost.asFloat32)
