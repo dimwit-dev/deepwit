@@ -9,6 +9,9 @@ case class VocabularyEmbedder[Vocab: Label, Embedding: Label, V: IsFloating](par
   override def apply(token: Tensor0[Int32]): Tensor1[Embedding, V] =
     params.vocabularyEmbeddings.slice(Axis[Vocab].at(token))
 
+  def unembed(embedding: Tensor1[Embedding, V]): Tensor1[Vocab, V] =
+    embedding.dot(Axis[Embedding])(params.vocabularyEmbeddings)
+
 object VocabularyEmbedder:
 
   case class Params[Vocab, Embedding, V](vocabularyEmbeddings: Tensor2[Vocab, Embedding, V])

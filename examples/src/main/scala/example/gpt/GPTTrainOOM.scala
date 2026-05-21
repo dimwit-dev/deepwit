@@ -21,6 +21,7 @@ object BACKUP:
   import java.io.{FileWriter, PrintWriter, File}
   import java.time.LocalDateTime
   import java.time.format.DateTimeFormatter
+  import FineWebDataset.{BatchSample, batchStream}
 
   import dimwit.FloatTree.map
   import me.shadaj.scalapy.py
@@ -36,7 +37,7 @@ object BACKUP:
     val weightDecayFactor = 0.1f
 
     val numLayers = 12
-    val vocabExtent = Axis[Vocab] -> 50257
+    val vocabExtent = Axis[Vocab] -> 50304
     val contextExtent = Axis[Context] -> 1024
     val embeddingExtent = Axis[Embedding] -> 768
     val headExtent = Axis[Head] -> 12
@@ -44,6 +45,11 @@ object BACKUP:
     val headKeyExtent = Axis[HeadKey] -> 64
     val headValueExtent = Axis[HeadValue] -> 64
     val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 3072
+
+    val valTokens = 10485760
+    val valSamples = valTokens / contextExtent.size
+    val valRunningBatchSize = runningBatchSize
+    val numBatchesPerValidation = valSamples / valRunningBatchSize
 
   object DebugConfig:
     val batchSize = 1
@@ -63,11 +69,6 @@ object BACKUP:
     val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 512
 
   import Config.*
-
-  case class BatchSample(
-      targets: Tensor2[Sample, Context, Int32],
-      inputs: Tensor2[Sample, Context, Int32]
-  )
 
   @main def train2(): Unit =
 
@@ -108,37 +109,9 @@ object BACKUP:
         stepCost: Tensor0[Float32]
     )
 
-    def loadData(binaryPath: String): LazyTensor1[Sample, UInt16] =
-      lazy val np = py.module("numpy")
-      liftPyTensor(
-        np.memmap(binaryPath, dtype = np.uint16, mode = "r")
-      )
-
-    def loadBatch(data: LazyTensor1[Sample, UInt16], batchSize: Int, key: Random.Key): BatchSample =
-      val maxIdx = data.shape(Axis[Sample]) - batchSize - 1
-      val randomIndices = IndependentDistribution.fromUnivariate(
-        Shape1(Axis[Sample] -> batchSize),
-        Uniform(Tensor0(0), Tensor0(maxIdx))
-      ).sample(key)
-      val shiftedIndices = randomIndices +! 1
-      val inputs = randomIndices.vmap(Axis[Sample])(startIndex =>
-        data.dynamicSlice(startIndex, contextExtent.size).relabelTo(Axis[Context])
-      )
-      val targets = shiftedIndices.vmap(Axis[Sample])(startIndex =>
-        data.dynamicSlice(startIndex, contextExtent.size).relabelTo(Axis[Context])
-      )
-      val gpu = GPU.devices.head
-      BatchSample(targets.asInt32.toDevice(gpu), inputs.asInt32.toDevice(gpu))
-
-    def batchStream(data: Tensor1[Sample, UInt16], batchSize: Int, initialKey: Random.Key): Iterator[BatchSample] =
-      val stateStream = Iterator.iterate((loadBatch(data, batchSize, initialKey), initialKey)):
-        case (_, prevKey) =>
-          val (nowKey, nextKey) = prevKey.split2()
-          (loadBatch(data, batchSize, nowKey), nextKey)
-      stateStream.map(_._1)
-
     val (trainKey, valKey) = dataKey.split2()
-    val trainStream = batchStream(loadData("data/openwebtext/train.bin"), runningBatchSize, trainKey)
+    val trainStream = batchStream("/home/mebr/Documents/Scala/modded-nanogpt/data/fineweb10B", "fineweb_train_", runningBatchSize, contextExtent.size, trainKey)
+    val valStream = batchStream("/home/mebr/Documents/Scala/modded-nanogpt/data/fineweb10B", "fineweb_val_", runningBatchSize, contextExtent.size, valKey)
 
     def loss[V: IsFloating](
         targets: Tensor1[Context, Int32],
@@ -157,6 +130,8 @@ object BACKUP:
           val logits = model.logits(inputs)
           loss(targets, logits)
       losses.mean
+    val jitCostFn = jit: (params: GPT.Params[BFloat16], batchSample: BatchSample) =>
+      costFunFor(batchSample)(params)
 
     def calcGradients(
         batchSample: BatchSample,
@@ -218,8 +193,8 @@ object BACKUP:
 
       TrainingState(params, adamWState, Tensor0(scalarLoss))
 
-    val jitGradientDescentStep = dimwit.eagerCleanup(gradientDescentStep)
-    // val jitGradientDescentStep = gradientDescentStep
+    // val jitGradientDescentStep = dimwit.eagerCleanup(gradientDescentStep)
+    val jitGradientDescentStep = gradientDescentStep
     val initState = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
 
     def miniBatchGradientDescent(
@@ -228,7 +203,8 @@ object BACKUP:
     ): Iterator[TrainingState] =
       samples.grouped(accumulationSteps).scanLeft(startState):
         case (state, runningBatches) =>
-          dimwit.gc()
+          // dimwit.gc()
+          System.gc() // TODO performance test this as Jax.gc() is stop-the-world
           jitGradientDescentStep(runningBatches.toList, state)
 
     val trainTrajectory = miniBatchGradientDescent(trainStream, initState)
@@ -237,7 +213,7 @@ object BACKUP:
     val csvFile = new File(s"training_log_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}.csv")
     val writer = new PrintWriter(new FileWriter(csvFile, true), true)
 
-    val headers = List("timestamp", "iter", "samples_per_s", "s_per_batch", "step_cost")
+    val headers = List("timestamp", "iter", "tokens_per_s", "samples_per_s", "s_per_batch", "step_cost")
     writer.println(headers.mkString(","))
 
     val timer = Timer.start()
@@ -252,11 +228,23 @@ object BACKUP:
           val logData = Map(
             "timestamp" -> java.time.Instant.now().toString,
             "iter" -> iter,
+            "tokens_per_s" -> f"${(effectiveBatchSize * contextExtent.size) / (secondsPerBatch)}%.2f",
             "samples_per_s" -> f"${effectiveBatchSize / (secondsPerBatch)}%.2f",
             "s_per_batch" -> f"$secondsPerBatch%.2f",
             "step_cost" -> f"${state.stepCost.item}%.2f"
           )
           writer.println(headers.map(h => logData(h)).mkString(","))
           println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
+      .tapEvery(100):
+        case (state, iter) =>
+          println(s"Performing validation at iter $iter...")
+          val params = state.params.asFloats(VType[BFloat16])
+          val avgValLoss = (1 to numBatchesPerValidation).iterator
+            .map:
+              case _ =>
+                val valBatch = valStream.next()
+                jitCostFn(params, valBatch).asFloat32.item
+            .sum / numBatchesPerValidation
+          println(s"Validation cost at iter $iter: ${avgValLoss}")
       .drop(1_000_000_000)
       .next()

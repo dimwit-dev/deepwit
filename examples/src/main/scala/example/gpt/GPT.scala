@@ -17,6 +17,7 @@ case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V
     val sequentialContext = positionalInjector(embeddingContext)
     val mixedContext = causalTransformer(sequentialContext)
     mixedContext.vmap(Axis[Context])(outputProjection)
+    // mixedContext.vmap(Axis[Context])(embedder.unembed) // weight tying
 
   def probits(tokenContext: Tensor1[Context, Int32]): Tensor2[Context, Vocab, V] =
     logits(tokenContext)
