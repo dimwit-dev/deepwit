@@ -7,6 +7,9 @@ import dimwit.stats.Normal
 import deepwit.base.{AffineLayer, LinearLayer}
 import deepwit.init
 
+import me.shadaj.scalapy.py
+import dimwit.python.PyBridge
+
 trait MultiHeadSelfAttention[Context: Label, Embedding: Label, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
@@ -31,6 +34,29 @@ case class MultiHeadCausalSelfAttention[Context: Label, Embedding: Label, V: IsF
 ) extends MultiHeadSelfAttention[Context, Embedding, V](params):
 
   protected override def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue, V]) = CausalSelfAttention(params)
+
+  override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+    /** Overwrite with jax.nn.dot_product_attention to enable FlashAttention on CUDA. Roughtly 1.5x faster */
+    val queries = context.dot(Axis[Embedding])(params.wq)
+    val keys = context.dot(Axis[Embedding])(params.wk)
+    val values = context.dot(Axis[Embedding])(params.wv)
+
+    val queriesJax = PyBridge.toPyTensor(queries)
+    val keysJax = PyBridge.toPyTensor(keys)
+    val valuesJax = PyBridge.toPyTensor(values)
+
+    lazy val jaxNn = py.module("jax.nn")
+
+    val resJax = jaxNn.dot_product_attention(
+      queriesJax,
+      keysJax,
+      valuesJax,
+      is_causal = true,
+      implementation = "cudnn"
+    )
+
+    val attended = PyBridge.liftPyTensor(resJax).asInstanceOf[Tensor3[Context, Head, HeadValue, V]]
+    attended.vmap(Axis[Context])(headsForContext => headProjection(headsForContext.flatten))
 
 case class MultiHeadFullSelfAttention[Context: Label, Embedding: Label, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V]
