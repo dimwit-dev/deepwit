@@ -17,6 +17,7 @@ object BACKUP:
   import dimwit.stats.Uniform
   import dimwit.hardware.DeviceBackend.{CPU, GPU}
   import dimwit.FloatTree.ops.*
+  import deepwit.logging.TenZarrLogger
 
   import java.io.{FileWriter, PrintWriter, File}
   import java.time.LocalDateTime
@@ -215,7 +216,9 @@ object BACKUP:
     val trainTrajectory = miniBatchGradientDescent(trainStream, initState)
 
     // Initialize CSV File
-    val csvFile = new File(s"training_log_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}.csv")
+    val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+    val logger = new TenZarrLogger(f"out/GPT-2/$time")
+    val csvFile = new File(s"training_log_$time.csv")
     val writer = new PrintWriter(new FileWriter(csvFile, true), true)
 
     val headers = List("timestamp", "iter", "tokens_per_s", "samples_per_s", "s_per_batch", "step_cost")
@@ -223,6 +226,7 @@ object BACKUP:
 
     val timer = Timer.start()
     println("Training...")
+
     val finalState = trainTrajectory
       .drop(1)
       .tapEvery(1):
@@ -240,8 +244,9 @@ object BACKUP:
           )
           writer.println(headers.map(h => logData(h)).mkString(","))
           println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
-      .tapEvery(100):
+      .tapEvery(1_000):
         case (state, iter) =>
+          println("-" * 30)
           println(s"Performing validation at iter $iter...")
           val params = state.params.asFloats(VType[BFloat16])
           val avgValLoss = (1 to numBatchesPerValidation).iterator
@@ -250,6 +255,9 @@ object BACKUP:
                 val valBatch = valStream.next()
                 jitCostFn(params, valBatch).asFloat32.item
             .sum / numBatchesPerValidation
-          println(s"Validation cost at iter $iter: ${avgValLoss}")
+          println(s"Validation cost $iter: ${avgValLoss}")
+          logger.logTensorTree("checkpoint", state)
+          println(s"Checkpoint saved/overwritten")
+          println("-" * 30)
       .drop(1_000_000_000)
       .next()

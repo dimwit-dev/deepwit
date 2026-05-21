@@ -23,24 +23,33 @@ class TenZarrLogger(storePath: String):
     // TODO
     ???
 
-  def logTensorTree[Data: TensorTree](name: String, iteration: Int, data: Data): Unit =
-    ???
-    /*TensorTree.foreach(
+  def logTensorTree[Data: TensorTree](name: String, data: Data): Unit =
+    TensorTree[Data].foreachWithName(
       data,
       [T <: Tuple, V] =>
         (labels: Labels[T]) ?=>
           (tensorName: String, tensor: Tensor[T, V]) =>
-            logTensor(s"$name/$iteration/$tensorName", tensor)
-    )*/
+            logTensor(s"$name/$tensorName", tensor, overwrite = true)
+    )
 
-  def logTensor[T <: Tuple, V](name: String, data: Tensor[T, V]): Unit =
-    assert(!root.__contains__(name).as[Boolean])
+  def logTensorTree[Data: TensorTree](name: String, iteration: Int, data: Data): Unit =
+    TensorTree[Data].foreachWithName(
+      data,
+      [T <: Tuple, V] =>
+        (labels: Labels[T]) ?=>
+          (tensorName: String, tensor: Tensor[T, V]) =>
+            logTensor(s"$name/$iteration/$tensorName", tensor, overwrite = false)
+    )
+
+  def logTensor[T <: Tuple, V](name: String, data: Tensor[T, V], overwrite: Boolean = false): Unit =
+    if !overwrite then assert(!root.__contains__(name).as[Boolean])
     val pyData = np.array(toPyTensor(data))
 
     val dset = root.create_dataset(
       name = name,
       shape = data.shape.dimensions.toPythonCopy,
-      dtype = "f4"
+      dtype = "f4",
+      overwrite = overwrite
     )
 
     if data.shape.dimensions.isEmpty
