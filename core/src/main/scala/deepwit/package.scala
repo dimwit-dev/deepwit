@@ -72,3 +72,14 @@ package object deepwit:
         .tapEach: (t, id) =>
           if id > 0 && id % n == 0 then f(t, id)
         .map(_._1)
+
+  import dimwit.*
+  import dimwit.Conversions.given
+  import dimwit.FloatTree
+  import dimwit.FloatTree.{map, mapLeaves}
+
+  extension [H, V: IsFloating](grads: Grad[H])(using FloatTree[H, V], TensorTree[H])
+    def clipGlobalNorm(maxNorm: Tensor0[V], epsilon: Double = 1e-6): Grad[H] =
+      val gradNorm = grads.value.mapLeaves([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, V]) => x.pow(2).sum).reduce(_ + _).sqrt
+      val scale = minimum(1f, maxNorm / (gradNorm + epsilon))
+      Grad(grads.value.map([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, V]) => x *! scale))

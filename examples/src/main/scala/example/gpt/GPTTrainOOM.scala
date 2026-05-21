@@ -24,6 +24,7 @@ object BACKUP:
   import FineWebDataset.{BatchSample, batchStream}
 
   import dimwit.FloatTree.map
+  import dimwit.FloatTree.mapLeaves
   import me.shadaj.scalapy.py
 
   object Config:
@@ -178,7 +179,11 @@ object BACKUP:
 
             (newAccCosts, newAccGrads)
 
-      val (params, adamWState) = jitAdamWUpdate(Grad(accumulatedGrads), state.params, state.adamWState)
+      val (params, adamWState) = jitAdamWUpdate(
+        Grad(accumulatedGrads).clipGlobalNorm(gradientClipNorm),
+        state.params,
+        state.adamWState
+      )
 
       val scalarLoss = accumulatedCosts.item
 
