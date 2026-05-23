@@ -45,7 +45,7 @@ def mnistCNNEval(checkpointPath: String) =
 
   // 4. Update Logic
   def updateIteration(it: Int): Unit =
-    val state = logger.loadTensorTree[TrainState]("checkpoint", iteration = it).get
+    val state = logger.loadTensorTree[TrainState](null, "checkpoint", iteration = it).get
     currentModel = MNistCNN(state.params)
 
     // Calculate global metrics for this iteration

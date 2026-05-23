@@ -79,14 +79,14 @@ def autoEncoderEval(checkpointPath: String) =
   val sEps = widgets.Slider(axEps, "Epsilon", 0.0, 100.0, valinit = 0.0)
 
   // 4. Define Update Logic
-  var model = Autoencoder(logger.loadTensorTree[TrainState]("checkpoint", iteration = iterations.head).get.params)
+  var model = Autoencoder(logger.loadTensorTree[TrainState](null, "checkpoint", iteration = iterations.head).get.params)
   var currentIt = iterations.head
   val update = (valVal: py.Any) =>
     val it = sIter.`val`.as[Double].toInt
     val dimIdx = sDim.`val`.as[Double].toInt
     val eps = sEps.`val`.as[Float]
 
-    val state = logger.loadTensorTree[TrainState]("checkpoint", iteration = it).get
+    val state = logger.loadTensorTree[TrainState](null, "checkpoint", iteration = it).get
     if currentIt != it then
       // Only load model if iteration has changed, avoid redundant loading
       println(s"Loading checkpoint for iteration: $it")

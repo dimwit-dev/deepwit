@@ -17,6 +17,7 @@ object BACKUP:
   import dimwit.stats.Uniform
   import dimwit.hardware.DeviceBackend.{CPU, GPU}
   import dimwit.FloatTree.ops.*
+  import nn.LearningRateSchedules.*
   import deepwit.logging.TenZarrLogger
 
   import java.io.{FileWriter, PrintWriter, File}
@@ -29,10 +30,11 @@ object BACKUP:
   import me.shadaj.scalapy.py
 
   object Config:
-    val runningBatchSize = 48 // 12
-    val effectiveBatchSize = 480
+    val runningBatchSize = 64 // 12
+    val effectiveBatchSize = 512
     val accumulationSteps = effectiveBatchSize / runningBatchSize
-    val learningRate = 6e-4f
+    val baseLearningRate = 6e-4f
+    val minLearningRate = baseLearningRate / 10f
     val beta1 = 0.9f
     val beta2 = 0.95f
     val gradientClipNorm: Float = 1.0f
@@ -100,8 +102,9 @@ object BACKUP:
       )
     )
 
+    val schedule = linearWarmup(baseLearningRate, 1_000) min cosineDecay(baseLearningRate, minLearningRate, 20_000).delay(1_000)
     val adamW = AdamW(
-      Adam(learningRate = learningRate, b1 = beta1, b2 = beta2),
+      Adam.withSchedule(schedule, b1 = beta1, b2 = beta2),
       weightDecayFactor = weightDecayFactor
     )
 
@@ -201,7 +204,10 @@ object BACKUP:
 
     // val jitGradientDescentStep = dimwit.eagerCleanup(gradientDescentStep)
     val jitGradientDescentStep = gradientDescentStep
-    val initState = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
+
+    val initState1 = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
+    println("Load checkpoint!")
+    val initState = new TenZarrLogger(f"out/GPT-2/20260522_014638").loadTensorTree[TrainingState](initState1, "checkpoint").get
 
     def miniBatchGradientDescent(
         samples: Iterator[BatchSample],
@@ -218,10 +224,11 @@ object BACKUP:
     // Initialize CSV File
     val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
     val logger = new TenZarrLogger(f"out/GPT-2/$time")
+
     val csvFile = new File(s"training_log_$time.csv")
     val writer = new PrintWriter(new FileWriter(csvFile, true), true)
 
-    val headers = List("timestamp", "iter", "tokens_per_s", "samples_per_s", "s_per_batch", "step_cost")
+    val headers = List("timestamp", "iter", "tokens_per_s", "samples_per_s", "s_per_batch", "learning_rate", "step_cost")
     writer.println(headers.mkString(","))
 
     val timer = Timer.start()
@@ -230,7 +237,8 @@ object BACKUP:
     val finalState = trainTrajectory
       .drop(1)
       .tapEvery(1):
-        case (state, iter) =>
+        case (state, _) =>
+          val iter = state.adamWState.iteration.asInt32.item
           // Training report
           timer.tick()
           val secondsPerBatch = timer.runningAvgSeconds
@@ -240,12 +248,14 @@ object BACKUP:
             "tokens_per_s" -> f"${(effectiveBatchSize * contextExtent.size) / (secondsPerBatch)}%.2f",
             "samples_per_s" -> f"${effectiveBatchSize / (secondsPerBatch)}%.2f",
             "s_per_batch" -> f"$secondsPerBatch%.2f",
+            "learning_rate" -> f"${schedule(state.adamWState.iteration)}",
             "step_cost" -> f"${state.stepCost.item}%.2f"
           )
           writer.println(headers.map(h => logData(h)).mkString(","))
           println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
       .tapEvery(1_000):
-        case (state, iter) =>
+        case (state, _) =>
+          val iter = state.adamWState.iteration.asInt32.item
           println("-" * 30)
           println(s"Performing validation at iter $iter...")
           val params = state.params.asFloats(VType[BFloat16])
@@ -256,7 +266,7 @@ object BACKUP:
                 jitCostFn(params, valBatch).asFloat32.item
             .sum / numBatchesPerValidation
           println(s"Validation cost $iter: ${avgValLoss}")
-          logger.logTensorTree("checkpoint", state)
+          logger.logTensorTree("checkpoint", iter, state)
           println(s"Checkpoint saved/overwritten")
           println("-" * 30)
       .drop(1_000_000_000)

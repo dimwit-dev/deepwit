@@ -56,21 +56,26 @@ class TenZarrLogger(storePath: String):
     then dset.bracketUpdate(py.Dynamic.global.tuple(), pyData)
     else dset.bracketUpdate(py.Dynamic.global.slice(py.None), pyData)
 
-  def loadTensorTree[Data: TensorTree](name: String, iteration: Int): Option[Data] =
-    val iterationPath = s"$name/$iteration"
-    Option.when(root.__contains__(iterationPath).as[Boolean]):
-      ???
-      /*
-      TensorTree[Data].fill([T <: Tuple, V] =>
-        (labels: Labels[T]) ?=>
-          (tensorName: String) =>
-            val zarrArray = root.bracketAccess(s"$iterationPath/$tensorName")
-            val shape = zarrArray.shape.as[Seq[Int]]
-            val pyTensor =
-              if shape.isEmpty then zarrArray.bracketAccess(me.shadaj.scalapy.py.Dynamic.global.Ellipsis)
-              else zarrArray.bracketAccess(py.Dynamic.global.slice(py.None))
-            liftPyTensor[T, V](pyTensor)
-      )*/
+  def loadTensorTree[Data: TensorTree](tree: Data, name: String, iteration: Int): Option[Data] =
+    loadTensorTreeFromPath(tree, s"$name/$iteration")
+
+  def loadTensorTree[Data: TensorTree](tree: Data, name: String): Option[Data] =
+    loadTensorTreeFromPath(tree, s"$name")
+
+  def loadTensorTreeFromPath[Data: TensorTree](tree: Data, path: String): Option[Data] =
+    Option.when(root.__contains__(path).as[Boolean]):
+      summon[TensorTree[Data]].mapWithName(
+        tree,
+        [T <: Tuple, V] =>
+          (labels: Labels[T]) ?=>
+            (tensorName: String, dummy: Tensor[T, V]) =>
+              val zarrArray = root.bracketAccess(s"$path/$tensorName")
+              val shape = zarrArray.shape.as[Seq[Int]]
+              val pyTensor =
+                if shape.isEmpty then zarrArray.bracketAccess(me.shadaj.scalapy.py.Dynamic.global.Ellipsis)
+                else zarrArray.bracketAccess(py.Dynamic.global.slice(py.None))
+              liftPyTensor[T, V](pyTensor)
+      )
 
   def loadTree[Data: TensorTree](name: String, iteration: Int): Option[Data] =
     Option.when(root.as[py.Dynamic].__contains__(name).as[Boolean]):
