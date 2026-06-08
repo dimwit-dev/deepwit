@@ -207,7 +207,7 @@ object BACKUP:
 
     val initState1 = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
     println("Load checkpoint!")
-    val initState = new TenZarrLogger(f"out/GPT-2/20260522_014638").loadTensorTree[TrainingState](initState1, "checkpoint").get
+    val initState = new TenZarrLogger(f"out/GPT-2/20260526_065320").loadTensorTree[TrainingState](initState1, "checkpoint", 18_006).get
 
     def miniBatchGradientDescent(
         samples: Iterator[BatchSample],

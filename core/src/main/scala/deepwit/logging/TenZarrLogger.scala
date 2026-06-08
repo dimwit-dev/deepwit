@@ -43,7 +43,7 @@ class TenZarrLogger(storePath: String):
 
   def logTensor[T <: Tuple, V](name: String, data: Tensor[T, V], overwrite: Boolean = false): Unit =
     if !overwrite then assert(!root.__contains__(name).as[Boolean])
-    val pyData = np.array(toPyTensor(data))
+    val pyData = np.array(toPyTensor(data)) // TODO I think this leads to a OOM on "classic" RAM
 
     val dset = root.create_dataset(
       name = name,

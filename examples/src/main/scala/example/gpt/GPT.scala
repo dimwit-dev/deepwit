@@ -1,9 +1,11 @@
 package example.gpt
 
 import dimwit.*
+import dimwit.Conversions.given
 import nn.ActivationFunctions.softmax
 import deepwit.*
 import deepwit.labels.{Head, HeadKey, HeadQuery, HeadValue}
+import dimwit.stats.Categorical
 
 case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V]):
 
@@ -27,7 +29,35 @@ case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V
     logits(tokenContext)
       .argmax(Axis[Vocab])
 
-  def generate() = ??? // TODO
+  def generate(
+      prompt: Seq[Int],
+      contextSize: Int = 1024,
+      temperature: Float = 1.0f
+  )(using key: Random.Key): LazyList[Int] =
+    val initialContext = if prompt.size > contextSize then prompt.takeRight(contextSize) else prompt
+    val fastLogits = jit(logits)
+
+    LazyList.unfold((initialContext, key)): (currentContext, currentKey) =>
+
+      val padLength = contextSize - currentContext.size
+      val padded = currentContext ++ Seq.fill(padLength)(0)
+
+      val contextTensor = Tensor1(Axis[Context], VType[Int32]).fromArray(padded.toArray)
+      val stepLogits = fastLogits(contextTensor)
+      val lastLogits = stepLogits.slice(Axis[Context].at(currentContext.size - 1))
+      val scaledLogits = lastLogits /! temperature
+      val probs = Prob(softmax(scaledLogits.asFloat32))
+
+      val (nextKey, sampleKey) = currentKey.split2()
+      val nextTokenTensor = Categorical(probs).sample(sampleKey)
+      val nextToken = nextTokenTensor.item
+
+      val nextContext = if currentContext.size >= contextSize then
+        currentContext.tail :+ nextToken
+      else
+        currentContext :+ nextToken
+
+      Some((nextToken, (nextContext, nextKey)))
 
 object GPT:
 
