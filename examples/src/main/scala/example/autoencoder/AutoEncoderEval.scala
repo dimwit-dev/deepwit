@@ -1,6 +1,6 @@
-package example.autoencoder
+package deepwit.example.autoencoder
 
-import deepwit.logging.TenZarrLogger
+import deepwit.logging.TensorTreeLogger
 import examples.dataset.MNISTLoader
 import MNISTLoader.TestSample
 
@@ -50,8 +50,8 @@ def autoEncoderEval(checkpointPath: String) =
 
   val emptyPlaceholderImg = toPyTensor(toImg2D(Tensor.like(original).fill(0f)))
 
-  val logger = new TenZarrLogger(checkpointPath)
-  val iterations = logger.iterations("checkpoint")
+  val logger = new TensorTreeLogger(checkpointPath)
+  val iterations = logger.iterations
 
   // 2. Setup Figure and Subplots
   val fig = plt.figure(figsize = List(18, 7).toPythonCopy)
@@ -79,14 +79,14 @@ def autoEncoderEval(checkpointPath: String) =
   val sEps = widgets.Slider(axEps, "Epsilon", 0.0, 100.0, valinit = 0.0)
 
   // 4. Define Update Logic
-  var model = Autoencoder(logger.loadTensorTree[TrainState](null, "checkpoint", iteration = iterations.head).get.params)
+  var model = Autoencoder(logger.load[TrainState](iterations.head).get.params)
   var currentIt = iterations.head
   val update = (valVal: py.Any) =>
     val it = sIter.`val`.as[Double].toInt
     val dimIdx = sDim.`val`.as[Double].toInt
     val eps = sEps.`val`.as[Float]
 
-    val state = logger.loadTensorTree[TrainState](null, "checkpoint", iteration = it).get
+    val state = logger.load[TrainState](it).get
     if currentIt != it then
       // Only load model if iteration has changed, avoid redundant loading
       println(s"Loading checkpoint for iteration: $it")

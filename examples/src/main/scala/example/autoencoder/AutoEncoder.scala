@@ -1,4 +1,4 @@
-package example.autoencoder
+package deepwit.example.autoencoder
 
 import examples.timed
 import dimwit.*

@@ -12,7 +12,7 @@ class LinearLayerSuite extends AnyFunSpec with Matchers:
   describe("LinearLayer"):
 
     it("identity"):
-      val linearLayer = LinearLayer(LinearLayer.Params.identity(Axis[A] -> 5))
+      val linearLayer = LinearLayer(LinearLayer.Params.identity(Axis[A] -> 5, VType[Float32]))
       val t = Tensor(Shape1(Axis[A] -> 5)).fromArray(Array(1f, 2f, 3f, 4f, 5f))
       linearLayer(t) should approxEqual(t.relabelTo(Axis[Prime[A]]), 1e-6f)
 

@@ -38,8 +38,8 @@ lazy val examples = (project in file("examples"))
   .settings(
     name := "deepwit-examples",
     libraryDependencies ++= Seq(
-      "org.scala-lang" %% "toolkit" % "0.1.7",
-      "dev.scalapy" %% "scalapy-core" % "0.5.3"
+      "dev.scalapy" %% "scalapy-core" % "0.5.3",
+      "ch.contrafactus" %% "plotwit-core" % "0.1.0-SNAPSHOT" changing ()
     ),
     fork := true,
     // Don't publish examples

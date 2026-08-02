@@ -9,6 +9,7 @@ package object deepwit:
   export deepwit.transformer.attention.{SelfAttention, CrossAttention, MultiHeadSelfAttention, MultiHeadCrossAttention}
   export deepwit.init.{xavierNormal, xavierUniform}
   export deepwit.normalization.{LayerNorm, RMSNorm}
+  export deepwit.logging.TensorTreeLogger
 
   // Dropout thinning
   export deepwit.regularization.{sampleThinAffineLayer, sampleThinLearnedAbsolutePositionalInjector, sampleThinLinearLayer, sampleThinProjection, sampleThinVocabularyEmbedder}

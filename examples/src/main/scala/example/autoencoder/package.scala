@@ -1,4 +1,4 @@
-package example
+package deepwit.example
 
 import dimwit.{Label, |*|}
 import examples.dataset.MNISTLoader

@@ -2,14 +2,12 @@ package deepwit.example.mnist_classification
 
 import dimwit.*
 import dimwit.Conversions.given
-import dimwit.random.Random
+import dimwit.optimizer.GradientDescent
+
 import deepwit.*
+
 import examples.timed
-import examples.dataset.MNISTLoader
-import nn.GradientDescent
-import deepwit.cnn.Conv2DLayer
-import examples.dataset.MNISTBatchSample
-import deepwit.logging.TenZarrLogger
+import examples.dataset.{MNISTLoader, MNISTBatchSample}
 
 private trait Batch derives Label
 
@@ -22,23 +20,12 @@ def mnistCNNTrain(): Unit =
   val numIterations = 10_000
   val batchSize = 128
 
-  val (dataKey, trainKey) = Random.Key(42).split2()
+  val trainKey = Random.Key(42)
 
   val trainDataset = MNISTLoader.createTrainingDataset().get
   val testDataset = MNISTLoader.createTestDataset().get
 
-  val trainDataStream = trainDataset.toBatchStream(Axis[Batch] -> batchSize)
-
-  val initialParams = MNistCNN.Params(trainKey)(16, 32)
-
-  def batchLoss(batchImages: Tensor[(Batch, Height, Width), Float32], batchLabels: Tensor1[Batch, Int32])(
-      params: MNistCNN.Params
-  ): Tensor0[Float32] =
-    val model = MNistCNN(params)
-    val batchLosses = zipvmap(Axis[Batch])(batchImages, batchLabels):
-      case (img, target) =>
-        CategoricalCrossEntropy.fromLogits(target, model.logits(img))
-    batchLosses.mean
+  val trainDataBatchStream = trainDataset.toBatchStream(Axis[Batch] -> batchSize)
 
   def costFnFor[S: Label](images: Tensor3[S, Height, Width, Float32], labels: Tensor1[S, Int32])(params: MNistCNN.Params): Tensor0[Float32] =
     val model = MNistCNN(params)
@@ -47,47 +34,40 @@ def mnistCNNTrain(): Unit =
       CategoricalCrossEntropy.fromLogits(label, logits)
     .mean
 
-  val optimizer = GradientDescent(learningRate = Tensor0(learningRate))
+  val optimizer = GradientDescent(learningRate = learningRate)
 
   def gradientStep(
       batch: MNISTBatchSample[Batch],
       state: TrainState
   ): TrainState =
-    val grads = Autodiff.grad(costFnFor(batch.images, batch.labels))(state.params)
-    val cost = costFnFor(batch.images, batch.labels)(state.params)
+    val (cost, grads) = Autodiff.valueAndGrad(costFnFor(batch.images, batch.labels))(state.params)
     val (newParams, _) = optimizer.update(grads, state.params, ())
     TrainState(newParams, cost)
-
   val jitGradientStep = jitDonatingUnsafe(gradientStep)
 
-  // Training Loop
-  val trainTrajectory = trainDataStream.scanLeft(TrainState(initialParams, Tensor0(-1f))):
+  val initialParams = MNistCNN.Params(trainKey)(16, 32)
+  val trainTrajectory = trainDataBatchStream.scanLeft(TrainState(initialParams, Tensor0(-1f))):
     case (state, batch) =>
       dimwit.gc()
       jitGradientStep(batch, state)
 
-  // Evaluation
-  def evaluate[S: Label](params: MNistCNN.Params, dataX: Tensor[(S, Height, Width), Float32], dataY: Tensor1[S, Int32]): Tensor0[Float32] =
-    val model = MNistCNN(params)
-    val predictions = dataX.vmap(Axis[S])(model)
-    val matches = zipvmap(Axis[S])(predictions, dataY)(_ === _)
-    matches.asFloat32.mean
-
   val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val logger = new TenZarrLogger(f"out/MNistCNN/$time")
+  val logger = new TensorTreeLogger(f"out/MNistCNN/$time")
   val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
 
   val state = trainTrajectory
     .tapEvery(10):
-      case (state, step) =>
-        println(trainMonitor.report(step, state))
+      // Print training progress
+      case (state, step) => println(trainMonitor.report(step, state))
     .tapEvery(500):
+      // Evaluate on test dataset
       case (state, step) =>
         val lossValue = costFnFor(testDataset.images, testDataset.labels)(state.params).item
         println(s"Step $step | Test loss: $lossValue")
     .tapEvery(500):
+      // Save checkpoint
       case (state, step) =>
-        logger.logTensorTree("checkpoint", step, state)
+        logger.save(state, step)
         println(s"Checkpoint saved at epoch $step")
     .drop(numIterations)
-    .head
+    .next()

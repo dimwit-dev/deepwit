@@ -16,7 +16,7 @@ case class CrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: L
     val keys = crossContext.vmap(Axis[CrossContext])(encodeToKey)
     val values = crossContext.vmap(Axis[CrossContext])(encodeToValue)
     val attentionWeights = calculateAttentionWeights(queries, keys)
-    val res = attentionWeights.dot(Axis[AttentionWeights ~ CrossContext])(values)
+    val res = attentionWeights.dot(Axis[AttentionWeights] -> Axis[CrossContext])(values)
     res
 
   protected def encodeToQuery(embedding: Tensor1[Embedding, V]) = LinearLayer(params.wq)(embedding)
@@ -25,7 +25,7 @@ case class CrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: L
 
   protected def calculateAttentionScores(queries: Tensor2[Context, Query, V], keys: Tensor2[CrossContext, Key, V]): Tensor2[Context, CrossContext, V] =
     val dk = Math.sqrt(keys.shape(Axis[Key])).toFloat
-    queries.dot(Axis[Query ~ Key])(keys) /! dk
+    queries.dot(Axis[Query] -> Axis[Key])(keys) /! dk
 
   protected def calculateAttentionWeights(queries: Tensor2[Context, Query, V], keys: Tensor2[CrossContext, Key, V]) =
     val attentionScores = calculateAttentionScores(queries, keys)

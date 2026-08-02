@@ -16,7 +16,7 @@ trait SelfAttention[Context: Label, Embedding: Label, Query: Label, Key: Label, 
 
   protected def calculateAttentionScores(queries: Tensor2[Context, Query, V], keys: Tensor2[Context, Key, V]): Tensor2[Context, Prime[Context], V] =
     val dk = Math.sqrt(keys.shape(Axis[Key])).toFloat
-    queries.dot(Axis[Query ~ Key])(keys) /! dk
+    queries.dot(Axis[Query] -> Axis[Key])(keys) /! dk
 
   protected def calculateAttentionWeights(attentionScores: Tensor2[Context, Prime[Context], V]): Tensor2[Context, AttentionWeights, V]
 
@@ -26,7 +26,7 @@ trait SelfAttention[Context: Label, Embedding: Label, Query: Label, Key: Label, 
     val values = context.vmap(Axis[Context])(encodeToValue)
     val attentionScores = calculateAttentionScores(queries, keys)
     val attentionWeights = calculateAttentionWeights(attentionScores)
-    val res = attentionWeights.dot(Axis[AttentionWeights ~ Context])(values)
+    val res = attentionWeights.dot(Axis[AttentionWeights] -> Axis[Context])(values)
     res
 
 case class FullSelfAttention[Context: Label, Embedding: Label, Query: Label, Key: Label, Value: Label, V: IsFloating](

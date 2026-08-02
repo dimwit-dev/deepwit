@@ -16,10 +16,10 @@ case class MNISTDataset[S: Label](images: Tensor3[S, Height, Width, Float32], la
 
   def toBatchStream[Batch: Label](
       batchExtent: AxisExtent[Batch]
-  ): LazyList[MNISTBatchSample[Batch]] =
+  ): Iterator[MNISTBatchSample[Batch]] =
     val totalSamples = images.shape(Axis[S])
     val batchSize = batchExtent.size
-    LazyList.iterate(0)(_ + batchSize).map: offset =>
+    Iterator.iterate(0)(_ + batchSize).map: offset =>
       val batchIds = (0 until batchSize).map(i => (offset + i) % totalSamples)
       val batchImages = images.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
       val batchLabels = labels.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
@@ -90,7 +90,8 @@ object MNISTLoader:
     val labelsFile = s"$dataDir/train-labels-idx1-ubyte"
     createDataset[TrainSample](imagesFile, labelsFile)
 
-  def createTestDataset(dataDir: String = "data"): Try[MNISTDataset[TestSample]] =
-    val imagesFile = s"$dataDir/t10k-images-idx3-ubyte"
-    val labelsFile = s"$dataDir/t10k-labels-idx1-ubyte"
+  def createTestDataset(dataDir: String = "/data"): Try[MNISTDataset[TestSample]] =
+    val path = getClass.getResource(dataDir).getPath()
+    val imagesFile = s"$path/t10k-images-idx3-ubyte"
+    val labelsFile = s"$path/t10k-labels-idx1-ubyte"
     createDataset[TestSample](imagesFile, labelsFile)

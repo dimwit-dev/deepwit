@@ -1,4 +1,4 @@
-package example.autoencoder
+package deepwit.example.autoencoder
 
 import examples.timed
 import dimwit.*
@@ -8,7 +8,7 @@ import deepwit.*
 import dimwit.stats.Normal
 import dimwit.random.Random
 import nn.ActivationFunctions.relu
-import nn.GradientDescent
+import dimwit.optimizer.GradientDescent
 import dimwit.jax.Jax
 import nn.ActivationFunctions.sigmoid
 import dimwit.random.Random.Key
@@ -16,7 +16,7 @@ import dimwit.random.Random.Key
 import examples.dataset.MNISTLoader
 import MNISTLoader.{Sample, TrainSample, TestSample}
 import dimwit.python.PyBridge.toPyTensor
-import deepwit.logging.TenZarrLogger
+import deepwit.logging.TensorTreeLogger
 
 private trait Batch derives Label
 
@@ -54,7 +54,7 @@ def autoEncoderTraining(): Unit =
         .sum
       .mean
 
-  val optimizer = GradientDescent(learningRate = Tensor0(learningRate))
+  val optimizer = GradientDescent(learningRate = learningRate)
 
   def gradientStep(batch: Tensor3[Batch, Height, Width, Float32], state: TrainState): TrainState =
     val grads = Autodiff.grad(costFnFor(batch))(state.params)
@@ -77,7 +77,7 @@ def autoEncoderTraining(): Unit =
       jitGradientStep(batch, state)
 
   val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val logger = new TenZarrLogger(f"out/AutoEncoder/$time")
+  val logger = new TensorTreeLogger(f"out/AutoEncoder/$time")
 
   val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
 
@@ -91,9 +91,9 @@ def autoEncoderTraining(): Unit =
         println(s"Step $step | Test loss: $lossValue")
     .tapEvery(500):
       case (state, step) =>
-        logger.logTensorTree("checkpoint", step, state)
+        logger.save(state, step)
         println(s"Checkpoint saved at epoch $step")
     .drop(numIterations)
-    .head
+    .next()
 
   println("Done")

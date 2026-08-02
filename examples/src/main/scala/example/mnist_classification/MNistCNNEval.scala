@@ -1,6 +1,6 @@
 package deepwit.example.mnist_classification
 
-import deepwit.logging.TenZarrLogger
+import deepwit.logging.TensorTreeLogger
 import examples.dataset.MNISTLoader
 import MNISTLoader.{TestSample, Height, Width}
 
@@ -21,8 +21,8 @@ def mnistCNNEval(checkpointPath: String) =
 
   // 1. Setup Data
   val testDataset = MNISTLoader.createTestDataset().get
-  val logger = new TenZarrLogger(checkpointPath)
-  val iterations = logger.iterations("checkpoint")
+  val logger = new TensorTreeLogger(checkpointPath)
+  val iterations = logger.iterations
 
   if iterations.isEmpty then throw new RuntimeException("No checkpoints found!")
 
@@ -45,7 +45,7 @@ def mnistCNNEval(checkpointPath: String) =
 
   // 4. Update Logic
   def updateIteration(it: Int): Unit =
-    val state = logger.loadTensorTree[TrainState](null, "checkpoint", iteration = it).get
+    val state = logger.load[TrainState](it).get
     currentModel = MNistCNN(state.params)
 
     // Calculate global metrics for this iteration
