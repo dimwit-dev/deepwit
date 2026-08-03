@@ -25,8 +25,7 @@ lazy val core = (project in file("core"))
       "org.scalacheck" %% "scalacheck" % "1.18.0" % Test,
       "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % Test,
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
-      "ch.contrafactus" %% "dimwit-core" % "0.1.0-SNAPSHOT" changing (),
-      "ch.contrafactus" %% "dimwit-nn" % "0.1.0-SNAPSHOT" changing ()
+      "ch.contrafactus" %% "dimwit-core" % "0.1.0-SNAPSHOT" changing ()
     ),
     Compile / packageSrc / publishArtifact := true,
     Compile / packageDoc / publishArtifact := true

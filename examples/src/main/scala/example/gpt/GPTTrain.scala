@@ -11,8 +11,8 @@ import dimwit.Conversions.given
 import deepwit.*
 import deepwit.labels.{Head, HeadQuery, HeadKey, HeadValue}
 import nn.ActivationFunctions.gelu
-import nn.Adam
-import nn.AdamW
+import dimwit.optimizer.Adam
+import dimwit.optimizer.AdamW
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
 import dimwit.stats.Uniform
 import dimwit.hardware.DeviceBackend.{CPU, GPU}
