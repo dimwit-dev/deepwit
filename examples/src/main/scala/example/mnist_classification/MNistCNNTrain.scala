@@ -8,17 +8,18 @@ import deepwit.*
 
 import examples.timed
 import examples.dataset.{MNISTLoader, MNISTBatchSample}
+import dimwit.optimizer.GradientDescentState
 
 private trait Batch derives Label
 
-case class TrainState(params: MNistCNN.Params, lastCost: Tensor0[Float32])
+case class TrainState(params: MNistCNN.Params, optimizerState: GradientDescentState[MNistCNN.Params], lastCost: Tensor0[Float32])
 
 @main
 def mnistCNNTrain(): Unit =
 
-  val learningRate = 0.01f
   val numIterations = 10_000
   val batchSize = 128
+  val learningRate = 0.01f
 
   val trainKey = Random.Key(42)
 
@@ -41,12 +42,13 @@ def mnistCNNTrain(): Unit =
       state: TrainState
   ): TrainState =
     val (cost, grads) = Autodiff.valueAndGrad(costFnFor(batch.images, batch.labels))(state.params)
-    val (newParams, _) = optimizer.update(grads, state.params, ())
-    TrainState(newParams, cost)
+    val (newParams, newOptimizerState) = optimizer.update(grads, state.params, state.optimizerState)
+    TrainState(newParams, newOptimizerState, cost)
   val jitGradientStep = jitDonatingUnsafe(gradientStep)
 
   val initialParams = MNistCNN.Params(trainKey)(16, 32)
-  val trainTrajectory = trainDataBatchStream.scanLeft(TrainState(initialParams, Tensor0(-1f))):
+  val initialOptimizerState = optimizer.init(initialParams)
+  val trainTrajectory = trainDataBatchStream.scanLeft(TrainState(initialParams, initialOptimizerState, Tensor0(-1f))):
     case (state, batch) =>
       dimwit.gc()
       jitGradientStep(batch, state)

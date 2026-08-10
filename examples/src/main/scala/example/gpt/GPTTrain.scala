@@ -11,12 +11,11 @@ import dimwit.Conversions.given
 import deepwit.*
 import deepwit.labels.{Head, HeadQuery, HeadKey, HeadValue}
 import nn.ActivationFunctions.gelu
-import dimwit.optimizer.Adam
-import dimwit.optimizer.AdamW
+import dimwit.optimizer.{Adam, AdamState, AdamW}
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
 import dimwit.stats.Uniform
 import dimwit.hardware.DeviceBackend.{CPU, GPU}
-import dimwit.FloatTree.ops.asFloats
+import dimwit.TreeOf.ops.asFloats
 import me.shadaj.scalapy.py
 import FineWebDataset.{BatchSample, batchStream}
 
@@ -84,13 +83,13 @@ import Config.*
   )
 
   val adamW = AdamW(
-    Adam(learningRate = learningRate, b1 = beta1, b2 = beta2),
+    Adam(learningRate = learningRate, beta1 = beta1, beta2 = beta2),
     weightDecayFactor = weightDecayFactor
   )
 
   case class TrainingState(
       params: GPT.Params[Float32],
-      adamWState: adamW.State[GPT.Params[Float32]],
+      adamWState: AdamState[GPT.Params[Float32]],
       stepCost: Tensor0[Float32]
   )
 

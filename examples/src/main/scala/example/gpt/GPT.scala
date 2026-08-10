@@ -6,6 +6,7 @@ import nn.ActivationFunctions.softmax
 import deepwit.*
 import deepwit.labels.{Head, HeadKey, HeadQuery, HeadValue}
 import dimwit.stats.Categorical
+import scala.CanEqual.derived
 
 case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V]):
 
@@ -73,6 +74,11 @@ object GPT:
   )
 
   object Params:
+
+    given treeBFloat16: TreeOf[GPT.Params[BFloat16], BFloat16] = TreeOf.derived
+    given treeFloat32: TreeOf[GPT.Params[Float32], Float32] = TreeOf.derived
+    given tensorTreeParamsF16: TensorTree[GPT.Params[BFloat16]] = TensorTree.derived
+    given tensorTreeParamsF32: TensorTree[GPT.Params[Float32]] = TensorTree.derived
 
     def init[V: IsFloating](numTransformerLayers: Int)(
         vocabExtent: AxisExtent[Vocab],

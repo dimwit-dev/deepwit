@@ -2,7 +2,7 @@ import scala.languageFeature.experimental.macros
 package object deepwit:
   export deepwit.base.{AffineLayer, LinearLayer}
   export deepwit.base.ActivationFunction.{gelu, relu, sigmoid, softmax}
-  export deepwit.cnn.{Conv2DLayer, AffineConv2DLayer, LinearConv2DLayer}
+  export deepwit.cnn.{Conv2DLayer, AffineConv2DLayer, LinearConv2DLayer, TransposeAffineConv2DLayer}
   export deepwit.embedder.{ConvImageToPatchEmbedder, LearnedAbsolutePositionalInjector, VocabularyEmbedder}
   export deepwit.transformer.{MLPEmbeddingMixer, Transformer, TransformerLayer, CrossTransformer, CrossTransformerLayer, CausalTransformer, BidirectionalTransformer}
   export deepwit.transformer.{causalMask, identityMask}
@@ -49,10 +49,15 @@ package object deepwit:
 
     case class PerformanceMonitor[S](batchSize: Int) extends Monitor[S]:
       private var lastTime = System.nanoTime()
+      private var lastStep = 0
+
       def report(step: Int, state: S): String =
+        require(step >= lastStep, "Step must be non-decreasing.")
+        val elapsedSteps = step - lastStep
+        lastStep = step
         val currentTime = System.nanoTime()
         val elapsedS = (currentTime - lastTime) / 1e9d
-        val sPerSec = batchSize / elapsedS
+        val sPerSec = (batchSize * elapsedSteps) / elapsedS
         lastTime = currentTime
         f"$sPerSec%.2f samples/sec"
 
@@ -76,10 +81,10 @@ package object deepwit:
 
   import dimwit.*
   import dimwit.Conversions.given
-  import dimwit.FloatTree
-  import dimwit.FloatTree.{map, mapLeaves}
+  import dimwit.TreeOf
+  import dimwit.TreeOf.{map, mapLeaves}
 
-  extension [H, V: IsFloating](grads: Grad[H])(using FloatTree[H, V], TensorTree[H])
+  extension [H: TensorTree, V: IsFloating](grads: Grad[H])(using TreeOf[H, V])
     def clipGlobalNorm(maxNorm: Tensor0[V], epsilon: Double = 1e-6): Grad[H] =
       val gradNorm = grads.value.mapLeaves([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, V]) => x.pow(2).sum).reduce(_ + _).sqrt
       val scale = minimum(1f, maxNorm / (gradNorm + epsilon))

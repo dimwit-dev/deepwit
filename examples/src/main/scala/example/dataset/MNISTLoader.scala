@@ -85,13 +85,12 @@ object MNISTLoader:
       val imagesFloat = images.asFloat32 /! 255.0f
       MNISTDataset(imagesFloat, labels.asInt32)
 
-  def createTrainingDataset(dataDir: String = "data"): Try[MNISTDataset[TrainSample]] =
+  def createTrainingDataset(dataDir: String = "./data"): Try[MNISTDataset[TrainSample]] =
     val imagesFile = s"$dataDir/train-images-idx3-ubyte"
     val labelsFile = s"$dataDir/train-labels-idx1-ubyte"
     createDataset[TrainSample](imagesFile, labelsFile)
 
-  def createTestDataset(dataDir: String = "/data"): Try[MNISTDataset[TestSample]] =
-    val path = getClass.getResource(dataDir).getPath()
-    val imagesFile = s"$path/t10k-images-idx3-ubyte"
-    val labelsFile = s"$path/t10k-labels-idx1-ubyte"
+  def createTestDataset(dataDir: String = "./data"): Try[MNISTDataset[TestSample]] =
+    val imagesFile = s"$dataDir/t10k-images-idx3-ubyte"
+    val labelsFile = s"$dataDir/t10k-labels-idx1-ubyte"
     createDataset[TestSample](imagesFile, labelsFile)

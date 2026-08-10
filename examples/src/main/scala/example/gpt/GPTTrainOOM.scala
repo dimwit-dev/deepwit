@@ -9,23 +9,25 @@ object BACKUP:
   import dimwit.Conversions.given
   import deepwit.*
   import deepwit.labels.{Head, HeadQuery, HeadKey, HeadValue}
+  import deepwit.optimizer.schedule.*
   import dimwit.nn.ActivationFunctions.gelu
-  import dimwit.optimizer.Adam
-  import dimwit.optimizer.AdamW
-  import dimwit.optimizer.LearningRateSchedule.*
+  import dimwit.optimizer.{AdamW, Adam, AdamState}
   import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
   import dimwit.stats.Uniform
   import dimwit.hardware.DeviceBackend.{CPU, GPU}
-  import dimwit.FloatTree.ops.*
+  import dimwit.TreeOf.ops.*
 
   import java.io.{FileWriter, PrintWriter, File}
   import java.time.LocalDateTime
   import java.time.format.DateTimeFormatter
   import FineWebDataset.{BatchSample, batchStream}
 
-  import dimwit.FloatTree.map
-  import dimwit.FloatTree.mapLeaves
+  import dimwit.TreeOf.map
+  import dimwit.TreeOf.mapLeaves
   import me.shadaj.scalapy.py
+
+  import deepwit.optimizer.schedule.LearningRateSchedule
+  import deepwit.optimizer.schedule.LearningRateSchedules.LinearWarmup
 
   object Config:
     val runningBatchSize = 64 // 12
@@ -100,15 +102,12 @@ object BACKUP:
       )
     )
 
-    val schedule = pointwiseMin(linearWarmup(baseLearningRate, 1_000), cosineDecay(baseLearningRate, minLearningRate, 20_000).delay(1_000))
-    val adamW = AdamW(
-      Adam(schedule, b1 = beta1, b2 = beta2),
-      weightDecayFactor = weightDecayFactor
-    )
+    val schedule = LinearWarmup(baseLearningRate, 1_000).followBy(CosineDecay(baseLearningRate, minLearningRate, 20_000))
+    val opt = LearningRateScheduler(lr => AdamW(Adam(lr, beta1 = beta1, beta2 = beta2), weightDecayFactor = weightDecayFactor), schedule)
 
     case class TrainingState(
         params: GPT.Params[Float32],
-        adamWState: adamW.State[GPT.Params[Float32]],
+        optState: LearningRateSchedulerState[GPT.Params[Float32], AdamState],
         stepCost: Tensor0[Float32]
     )
 
@@ -144,7 +143,7 @@ object BACKUP:
       Autodiff.valueAndGrad(costFn)(params)
 
     val jitCalcGradients = jit(calcGradients)
-    val jitAdamWUpdate = jitDonatingUnsafe(adamW.update[GPT.Params[Float32]])
+    val jitAdamWUpdate = jitDonatingUnsafe(opt.update[GPT.Params[Float32], Float32])
 
     def gradientDescentStep(
         runningBatchSamples: List[BatchSample],
@@ -181,10 +180,10 @@ object BACKUP:
 
             (newAccCosts, newAccGrads)
 
-      val (params, adamWState) = jitAdamWUpdate(
+      val (params, optState) = jitAdamWUpdate(
         Grad(accumulatedGrads).clipGlobalNorm(gradientClipNorm),
         state.params,
-        state.adamWState
+        state.optState
       )
 
       val scalarLoss = accumulatedCosts.item
@@ -198,12 +197,12 @@ object BACKUP:
             x
       )
 
-      TrainingState(params, adamWState, Tensor0(scalarLoss))
+      TrainingState(params, optState, Tensor0(scalarLoss))
 
     // val jitGradientDescentStep = dimwit.eagerCleanup(gradientDescentStep)
     val jitGradientDescentStep = gradientDescentStep
 
-    val initState = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
+    val initState = TrainingState(initParams, opt.init(initParams), Tensor0(-1f))
     // println("Load checkpoint!")
     // val initState = new TenZarrLogger(f"out/GPT-2/20260526_065320").loadTensorTree[TrainingState](initState1, "checkpoint", 18_006).get
 
@@ -236,7 +235,7 @@ object BACKUP:
       .drop(1)
       .tapEvery(1):
         case (state, _) =>
-          val step = state.adamWState.step.item
+          val step = state.optState.step.item
           // Training report
           timer.tick()
           val secondsPerBatch = timer.runningAvgSeconds
@@ -253,7 +252,7 @@ object BACKUP:
           println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
       .tapEvery(1_000):
         case (state, _) =>
-          val step = state.adamWState.step.item
+          val step = state.optState.step.item
           println("-" * 30)
           println(s"Performing validation at step $step...")
           val params = state.params.asFloats(VType[BFloat16])

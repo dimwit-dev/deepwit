@@ -5,7 +5,7 @@ import dimwit.Conversions.given
 import deepwit.*
 import Config.*
 import nn.ActivationFunctions.softmax
-import dimwit.FloatTree.ops.*
+import dimwit.TreeOf.ops.*
 
 import me.shadaj.scalapy.py
 import me.shadaj.scalapy.py.SeqConverters
