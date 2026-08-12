@@ -33,20 +33,23 @@ object Autoencoder:
         dHidden2Extent: AxisExtent[DHidden2],
         key: Random.Key
     ): Params =
+
+      def affineParams[In: Label, Out: Label](in: AxisExtent[In], out: AxisExtent[Out], key: Random.Key): AffineLayer.Params[In, Out, Float32] =
+        AffineLayer.Params.xavierNormal(in, out, VType[Float32], key)
+
       val inputSize = 28 * 28
-      val vtype = VType[Float32]
       val (encoderKey, decoderKey) = key.splitToTuple(2)
       val (encoderKey1, encoderKey2, encoderKey3) = encoderKey.splitToTuple(3)
       val encoderParams = Encoder.Params(
-        AffineLayer.Params.xavierNormal(Axis[Pixel] -> inputSize, eHidden1Extent, vtype, encoderKey1),
-        AffineLayer.Params.xavierNormal(eHidden1Extent, eHidden2Extent, vtype, encoderKey2),
-        AffineLayer.Params.xavierNormal(eHidden2Extent, latentExtent, vtype, encoderKey3)
+        affineParams(Axis[Pixel] -> inputSize, eHidden1Extent, encoderKey1),
+        affineParams(eHidden1Extent, eHidden2Extent, encoderKey2),
+        affineParams(eHidden2Extent, latentExtent, encoderKey3)
       )
       val (decoderKey1, decoderKey2, decoderKey3) = decoderKey.splitToTuple(3)
       val decoderParams = Decoder.Params(
-        AffineLayer.Params.xavierNormal(latentExtent, dHidden1Extent, vtype, decoderKey1),
-        AffineLayer.Params.xavierNormal(dHidden1Extent, dHidden2Extent, vtype, decoderKey2),
-        AffineLayer.Params.xavierNormal(dHidden2Extent, Axis[ReconstructedPixel] -> inputSize, vtype, decoderKey3)
+        affineParams(latentExtent, dHidden1Extent, decoderKey1),
+        affineParams(dHidden1Extent, dHidden2Extent, decoderKey2),
+        affineParams(dHidden2Extent, Axis[ReconstructedPixel] -> inputSize, decoderKey3)
       )
       Params(encoderParams, decoderParams)
 
