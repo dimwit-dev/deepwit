@@ -4,15 +4,20 @@ import dimwit.*
 import dimwit.Conversions.given
 import nn.ActivationFunctions.softmax
 import deepwit.*
-import deepwit.labels.{Head, HeadKey, HeadQuery, HeadValue}
+import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue}
 import dimwit.stats.Categorical
 import scala.CanEqual.derived
+import deepwit.embedder.VocabularyEmbedder
+import deepwit.embedder.LearnedAbsolutePositionalInjector
+import deepwit.base.LinearLayer
+import deepwit.transformer.Transformer
+import deepwit.transformer.MLPEmbeddingMixer
 
-case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V]):
+case class GPT[V: IsFloating](params: GPT.Params[V]):
 
   private val embedder = VocabularyEmbedder(params.embedderParams)
   private val positionalInjector = LearnedAbsolutePositionalInjector(params.positionalInjectorParams)
-  private val causalTransformer = CausalTransformer(hyperParams.transformer)(params.transformer)
+  private val causalTransformer = Transformer.causal(Axis[Context], params.transformer)
   private val outputProjection = LinearLayer(params.outputProjection)
 
   def logits(tokenContext: Tensor1[Context, Int32]): Tensor2[Context, Vocab, V] =
@@ -61,10 +66,6 @@ case class GPT[V: IsFloating](hyperParams: GPT.HyperParams)(params: GPT.Params[V
       Some((nextToken, (nextContext, nextKey)))
 
 object GPT:
-
-  case class HyperParams(
-      transformer: Transformer.HyperParams[Context, Embedding]
-  )
 
   case class Params[V](
       embedderParams: VocabularyEmbedder.Params[Vocab, Embedding, V],

@@ -1,11 +1,11 @@
-package deepwit.logging
+package deepwit.checkpointing
 
 import java.nio.file.Path
 import dimwit.tensortree.TensorTree
 import dimwit.tensortree.{TensorTreeIO, TensorTreeFormat}
 import java.io.FileNotFoundException
 
-class TensorTreeLogger(
+class TensorTreeCheckpointer(
     private val rootPath: String,
     private val format: TensorTreeFormat = TensorTreeFormat.Pickle,
     private val overwrite: Boolean = false

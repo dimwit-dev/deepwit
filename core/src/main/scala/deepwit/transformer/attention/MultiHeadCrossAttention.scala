@@ -2,15 +2,16 @@ package deepwit.transformer.attention
 
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.base.ActivationFunction.softmax
+import deepwit.base.softmax
 import dimwit.stats.Normal
 import deepwit.base.{AffineLayer, LinearLayer}
 import deepwit.init
+import dimwit.Label as Λ
+import deepwit.transformer.fullMask
 
-case class MultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label, V: IsFloating](
-    hyperParams: MultiHeadCrossAttention.HyperParams[CrossContext, Context]
-)(
-    params: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding, V]
+case class MultiHeadCrossAttention[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedding: Λ, V: IsFloating](
+    params: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding, V],
+    createAttentionMask: Shape2[Context, CrossContext] => Tensor2[Context, CrossContext, Bool]
 ) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
 
   override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
@@ -20,16 +21,12 @@ case class MultiHeadCrossAttention[CrossContext: Label, CrossEmbedding: Label, C
   protected def headAttention(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]) =
     zipvmap(Axis[Head])(params.wq, params.wk, params.wv):
       case (wq, wk, wv) =>
-        val headAttention = CrossAttention(hyperParams.headAttention)(CrossAttention.BaseParams(wq, wk, wv))
+        val headAttention = CrossAttention(CrossAttention.Params(wq, wk, wv), createAttentionMask)
         headAttention(crossContext, context)
 
   protected def headProjection(headValues: Tensor1[Head |*| HeadValue, V]) = AffineLayer(params.headProjection)(headValues)
 
 object MultiHeadCrossAttention:
-
-  case class HyperParams[CrossContext, Context](
-      val headAttention: CrossAttention.HyperParams[CrossContext, Context]
-  )
 
   case class Params[CrossEmbedding, Embedding, V: IsFloating](
       wq: Tensor3[Head, Embedding, HeadQuery, V],
@@ -40,7 +37,7 @@ object MultiHeadCrossAttention:
 
   object Params:
 
-    def xavierUniformDepthScaled[CrossEmbedding: Label, Embedding: Label, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
+    def xavierUniformDepthScaled[CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
       val nHeads = headExtent.size
       val headProjectionGain = Math.sqrt(1.0 / (2 * numTransformerLayers)).toFloat

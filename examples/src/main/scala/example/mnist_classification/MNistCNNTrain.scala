@@ -4,11 +4,12 @@ import dimwit.*
 import dimwit.Conversions.given
 import dimwit.optimizer.GradientDescent
 
-import deepwit.*
+import deepwit.loss.CategoricalCrossEntropy
 
-import examples.timed
-import examples.dataset.{MNISTLoader, MNISTBatchSample}
+import deepwit.examples.dataset.{MNISTLoader, MNISTBatchSample}
 import dimwit.optimizer.GradientDescentState
+import deepwit.{Monitor, tapEvery}
+import deepwit.checkpointing.TensorTreeCheckpointer
 
 private trait Batch derives Label
 
@@ -54,7 +55,7 @@ def mnistCNNTrain(): Unit =
       jitGradientStep(batch, state)
 
   val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val logger = new TensorTreeLogger(f"out/MNistCNN/$time")
+  val checkpointer = new TensorTreeCheckpointer(f"out/MNistCNN/$time")
   val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
 
   val state = trainTrajectory
@@ -69,7 +70,7 @@ def mnistCNNTrain(): Unit =
     .tapEvery(500):
       // Save checkpoint
       case (state, step) =>
-        logger.save(state, step)
+        checkpointer.save(state, step)
         println(s"Checkpoint saved at epoch $step")
     .drop(numIterations)
     .next()

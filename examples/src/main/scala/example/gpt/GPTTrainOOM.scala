@@ -1,6 +1,9 @@
 /** My attempt to add gradient accumulation => Leads to OOM... */
 
 package example.gpt
+import deepwit.checkpointing.TensorTreeCheckpointer
+import deepwit.transformer.MLPEmbeddingMixer
+import deepwit.loss.CategoricalCrossEntropy
 
 object BACKUP:
 
@@ -8,7 +11,7 @@ object BACKUP:
   import dimwit.jax.Jax
   import dimwit.Conversions.given
   import deepwit.*
-  import deepwit.labels.{Head, HeadQuery, HeadKey, HeadValue}
+  import deepwit.transformer.attention.{Head, HeadQuery, HeadKey, HeadValue}
   import deepwit.optimizer.schedule.*
   import dimwit.nn.ActivationFunctions.gelu
   import dimwit.optimizer.{AdamW, Adam, AdamState}
@@ -96,12 +99,6 @@ object BACKUP:
       initParamsKey
     )
 
-    val hyperParams = GPT.HyperParams(
-      Transformer.HyperParams(
-        LayerNorm.HyperParams(1e-12)
-      )
-    )
-
     val schedule = LinearWarmup(baseLearningRate, 1_000).followBy(CosineDecay(baseLearningRate, minLearningRate, 20_000))
     val opt = LearningRateScheduler(lr => AdamW(Adam(lr, beta1 = beta1, beta2 = beta2), weightDecayFactor = weightDecayFactor), schedule)
 
@@ -126,7 +123,7 @@ object BACKUP:
     )(
         params: GPT.Params[V]
     ): Tensor0[V] =
-      val model = GPT(hyperParams)(params)
+      val model = GPT(params)
       val losses = zipvmap(Axis[Sample])(batchSample.targets, batchSample.inputs):
         case (targets, inputs) =>
           val logits = model.logits(inputs)
@@ -220,7 +217,7 @@ object BACKUP:
 
     // Initialize CSV File
     val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-    val logger = TensorTreeLogger(f"out/GPT-2/$time")
+    val logger = TensorTreeCheckpointer(f"out/GPT-2/$time")
 
     val csvFile = new File(s"training_log_$time.csv")
     val writer = new PrintWriter(new FileWriter(csvFile, true), true)

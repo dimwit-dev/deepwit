@@ -2,8 +2,9 @@ package deepwit.example.mnist_classification
 
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.*
-import nn.ActivationFunctions.relu
+
+import deepwit.base.{AffineLayer, relu}
+import deepwit.cnn.AffineConv2DLayer
 
 object MNistCNN:
 
@@ -32,9 +33,9 @@ object MNistCNN:
         output = AffineLayer.Params.xavierUniform(embeddingDim, outputDim, VType[Float32], outputKey)
       )
 
-case class MNistCNN(params: MNistCNN.Params) extends Function[Tensor2[Height, Width, Float32], Tensor0[Int32]]:
-  private val conv1 = AffineConv2DLayer(Conv2DLayer.HyperParams(stride = 2, padding = Padding.SAME))(params.conv1)
-  private val conv2 = AffineConv2DLayer(Conv2DLayer.HyperParams(stride = 2, padding = Padding.SAME))(params.conv2)
+case class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):
+  private val conv1 = AffineConv2DLayer(params.conv1, stride = 2, padding = Padding.SAME)
+  private val conv2 = AffineConv2DLayer(params.conv2, stride = 2, padding = Padding.SAME)
   private val output = AffineLayer(params.output)
 
   def logits(image: Tensor2[Height, Width, Float32]): Tensor1[Output, Float32] =

@@ -2,18 +2,19 @@ package deepwit.transformer
 
 import dimwit.*
 import deepwit.normalization.LayerNorm
-import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCausalSelfAttention, MultiHeadCrossAttention}
+import dimwit.Label as Λ
+import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCrossAttention}
 
-class CrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context: Label, Embedding: Label, V: IsFloating](
-    hyperParams: CrossTransformerLayer.HyperParams[CrossContext, Context, Embedding]
-)(
-    params: CrossTransformerLayer.Params[CrossEmbedding, Embedding, V]
+class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedding: Λ, V: IsFloating](
+    params: CrossTransformerLayer.Params[CrossEmbedding, Embedding, V],
+    createCrossAttentionMask: Shape2[Context, CrossContext] => Tensor2[Context, CrossContext, Bool],
+    createSelfAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
 ) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
 
-  private val selfAttention = MultiHeadCausalSelfAttention[Context, Embedding, V](params.selfAttentionParams)
+  private val selfAttention = MultiHeadSelfAttention[Context, Embedding, V](params.selfAttentionParams, createSelfAttentionMask)
   private val selfAttentionPreNorm = LayerNorm(params.selfAttentionNormParams)
 
-  private val crossAttention = new MultiHeadCrossAttention(hyperParams.multiHeadCrossAttention)(params.crossAttentionParams)
+  private val crossAttention = new MultiHeadCrossAttention(params.crossAttentionParams, createCrossAttentionMask)
   private val crossAttentionPreNorm = LayerNorm(params.crossAttentionNormParams)
 
   private val mlp = MLPEmbeddingMixer(params.mlpParams)
@@ -37,12 +38,16 @@ class CrossTransformerLayer[CrossContext: Label, CrossEmbedding: Label, Context:
 
 object CrossTransformerLayer:
 
-  def apply[CrossContext: Label, Context: Label, CrossEmbedding: Label, Embedding: Label, V: IsFloating](hyperParams: HyperParams[CrossContext, Context, Embedding])(params: Params[CrossEmbedding, Embedding, V]): CrossTransformerLayer[CrossContext, CrossEmbedding, Context, Embedding, V] =
-    new CrossTransformerLayer(hyperParams)(params)
-
-  case class HyperParams[CrossContext: Label, Context: Label, Embedding: Label](
-      multiHeadCrossAttention: MultiHeadCrossAttention.HyperParams[CrossContext, Context]
-  )
+  def apply[CrossContext: Λ, Context: Λ, CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](
+      axis: Axis[Context],
+      crossAxis: Axis[CrossContext],
+      params: Params[CrossEmbedding, Embedding, V]
+  ): CrossTransformerLayer[CrossContext, CrossEmbedding, Context, Embedding, V] =
+    new CrossTransformerLayer(
+      params,
+      createCrossAttentionMask = fullMask[Context, CrossContext],
+      createSelfAttentionMask = causalMask[Context, Context]
+    )
 
   case class Params[CrossEmbedding, Embedding, V: IsFloating](
       crossAttentionParams: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding, V],
@@ -55,7 +60,7 @@ object CrossTransformerLayer:
 
   object Params:
 
-    def xavierUniformDepthScaled[CrossEmbedding: Label, Embedding: Label, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
+    def xavierUniformDepthScaled[CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
       val (selfAttnKey, crossAttnKey, mixKey) = key.splitToTuple(3)
       new Params[CrossEmbedding, Embedding, V](
         crossAttentionParams = MultiHeadCrossAttention.Params.xavierUniformDepthScaled(numTransformerLayers)(headExtent, headQueryExtent, headKeyExtent, headValueExtent, crossEmbeddingExtent, embeddingExtent, vtype, crossAttnKey),

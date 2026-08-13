@@ -9,7 +9,7 @@ import dimwit.*
 import dimwit.jax.Jax
 import dimwit.Conversions.given
 import deepwit.*
-import deepwit.labels.{Head, HeadQuery, HeadKey, HeadValue}
+import deepwit.transformer.attention.{Head, HeadQuery, HeadKey, HeadValue}
 import nn.ActivationFunctions.gelu
 import dimwit.optimizer.{Adam, AdamState, AdamW}
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
@@ -18,6 +18,8 @@ import dimwit.hardware.DeviceBackend.{CPU, GPU}
 import dimwit.TreeOf.ops.asFloats
 import me.shadaj.scalapy.py
 import FineWebDataset.{BatchSample, batchStream}
+import deepwit.transformer.MLPEmbeddingMixer
+import deepwit.loss.CategoricalCrossEntropy
 
 object Config:
   val batchSize = 64
@@ -76,12 +78,6 @@ import Config.*
     initParamsKey
   )
 
-  val hyperParams = GPT.HyperParams(
-    Transformer.HyperParams(
-      LayerNorm.HyperParams(1e-12)
-    )
-  )
-
   val adamW = AdamW(
     Adam(learningRate = learningRate, beta1 = beta1, beta2 = beta2),
     weightDecayFactor = weightDecayFactor
@@ -107,7 +103,7 @@ import Config.*
   )(
       params: GPT.Params[V]
   ): Tensor0[V] =
-    val model = GPT(hyperParams)(params)
+    val model = GPT(params)
     val losses = zipvmap(Axis[Sample])(batchSample.targets, batchSample.inputs):
       case (targets, inputs) =>
         val logits = model.logits(inputs)

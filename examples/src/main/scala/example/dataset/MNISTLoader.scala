@@ -1,4 +1,4 @@
-package examples.dataset
+package deepwit.examples.dataset
 
 import dimwit.*
 import dimwit.Conversions.given

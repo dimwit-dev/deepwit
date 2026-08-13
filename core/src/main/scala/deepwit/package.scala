@@ -1,27 +1,5 @@
 import scala.languageFeature.experimental.macros
 package object deepwit:
-  export deepwit.base.{AffineLayer, LinearLayer}
-  export deepwit.base.ActivationFunction.{gelu, relu, sigmoid, softmax}
-  export deepwit.cnn.{Conv2DLayer, AffineConv2DLayer, LinearConv2DLayer, TransposeAffineConv2DLayer}
-  export deepwit.embedder.{ConvImageToPatchEmbedder, LearnedAbsolutePositionalInjector, VocabularyEmbedder}
-  export deepwit.transformer.{MLPEmbeddingMixer, Transformer, TransformerLayer, CrossTransformer, CrossTransformerLayer, CausalTransformer, BidirectionalTransformer}
-  export deepwit.transformer.{causalMask, identityMask}
-  export deepwit.transformer.attention.{SelfAttention, CrossAttention, MultiHeadSelfAttention, MultiHeadCrossAttention}
-  export deepwit.init.{xavierNormal, xavierUniform}
-  export deepwit.normalization.{LayerNorm, RMSNorm}
-  export deepwit.logging.TensorTreeLogger
-
-  // Dropout thinning
-  export deepwit.regularization.{sampleThinAffineLayer, sampleThinLearnedAbsolutePositionalInjector, sampleThinLinearLayer, sampleThinProjection, sampleThinVocabularyEmbedder}
-
-  export deepwit.loss.{BinaryCrossEntropy, CategoricalCrossEntropy, BernoulliCrossEntropy}
-
-  object labels:
-    export deepwit.transformer.MLPEmbeddingMixer.EmbeddingMixed
-    export deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue}
-    export deepwit.transformer.attention.{Query, Key, Value, AttentionWeights}
-
-  // Train utils
 
   trait Monitor[S]:
     def report(step: Int, state: S): String
@@ -89,3 +67,8 @@ package object deepwit:
       val gradNorm = grads.value.mapLeaves([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, V]) => x.pow(2).sum).reduce(_ + _).sqrt
       val scale = minimum(1f, maxNorm / (gradNorm + epsilon))
       Grad(grads.value.map([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, V]) => x *! scale))
+
+  private[deepwit] def defaultEpsilon(dtype: DType): Float = dimwit.jax.Jax.jnp.finfo(dtype.jaxType).eps.as[Float]
+  private[deepwit] def unwrapEpsilon(eps: Float | (DType => Float), dtype: DType): Float = eps match
+    case ε: Float            => ε
+    case f: (DType => Float) => f(dtype)

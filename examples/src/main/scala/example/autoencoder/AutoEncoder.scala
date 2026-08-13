@@ -1,12 +1,10 @@
 package deepwit.example.autoencoder
 
-import examples.timed
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.*
 
-import nn.ActivationFunctions.{relu, sigmoid}
-import dimwit.random.Random
+import deepwit.base.AffineLayer
+import deepwit.base.{relu, sigmoid}
 
 case class Autoencoder(params: Autoencoder.Params):
 

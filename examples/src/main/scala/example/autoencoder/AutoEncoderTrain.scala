@@ -3,23 +3,21 @@ package deepwit.example.autoencoder
 import examples.timed
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.*
 
 import dimwit.stats.Normal
-import dimwit.random.Random
-import nn.ActivationFunctions.relu
 import dimwit.optimizer.GradientDescent
 import dimwit.optimizer.GradientDescentState
 import dimwit.jax.Jax
-import nn.ActivationFunctions.sigmoid
-import dimwit.random.Random.Key
 
-import examples.dataset.MNISTLoader
+import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.{Sample, TrainSample, TestSample}
-import dimwit.python.PyBridge.toPyTensor
-import deepwit.logging.TensorTreeLogger
 
-private trait Batch derives Label
+import deepwit.{Monitor, tapEvery}
+import deepwit.checkpointing.TensorTreeCheckpointer
+import deepwit.loss.BinaryCrossEntropy
+import deepwit.base.{relu, sigmoid}
+
+trait Batch derives Label
 
 case class TrainState(params: Autoencoder.Params, optimizerState: GradientDescentState[Autoencoder.Params], lastCost: Tensor0[Float32])
 
@@ -78,7 +76,7 @@ def autoEncoderTraining(): Unit =
       jitGradientStep(batch, state)
 
   val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val logger = new TensorTreeLogger(f"out/AutoEncoder/$time")
+  val logger = new TensorTreeCheckpointer(f"out/AutoEncoder/$time")
 
   val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
 

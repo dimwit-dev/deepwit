@@ -1,48 +1,36 @@
 package deepwit.transformer
 
 import dimwit.*
-import deepwit.labels.{Head, HeadKey, HeadQuery, HeadValue}
+import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue}
 import deepwit.normalization.LayerNorm
+import dimwit.Label as Λ
 
-trait Transformer[Context: Label, Embedding: Label, V: IsFloating](
-    hyperParams: Transformer.HyperParams[Context, Embedding]
-)(
-    params: Transformer.Params[Embedding, V]
+class Transformer[Context: Λ, Embedding: Λ, V: IsFloating](
+    params: Transformer.Params[Embedding, V],
+    createAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
   private val layers = params.transformerLayers.map(this.transformerLayer)
-  private val postNorm = LayerNorm(hyperParams.postNorm)(params.postNorm)
+  private val postNorm = LayerNorm(params.postNorm)
 
   override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     val res = layers.foldLeft(context):
       case (context_i, layer) => layer(context_i)
     res.vmap(Axis[Context])(postNorm)
 
-  protected def transformerLayer(params: TransformerLayer.Params[Embedding, V]): TransformerLayer[Context, Embedding, V]
-
-case class CausalTransformer[Context: Label, Embedding: Label, V: IsFloating](
-    hyperParams: Transformer.HyperParams[Context, Embedding]
-)(
-    params: Transformer.Params[Embedding, V]
-) extends Transformer[Context, Embedding, V](hyperParams)(params):
-
-  protected override def transformerLayer(params: TransformerLayer.Params[Embedding, V]): TransformerLayer[Context, Embedding, V] =
-    CausalTransformerLayer(params)
-
-case class BidirectionalTransformer[Context: Label, Embedding: Label, V: IsFloating](
-    hyperParams: Transformer.HyperParams[Context, Embedding]
-)(
-    params: Transformer.Params[Embedding, V]
-) extends Transformer[Context, Embedding, V](hyperParams)(params):
-
-  protected override def transformerLayer(params: TransformerLayer.Params[Embedding, V]): TransformerLayer[Context, Embedding, V] =
-    BidirectionalTransformerLayer(params)
+  protected def transformerLayer(params: TransformerLayer.Params[Embedding, V]) = TransformerLayer(params, createAttentionMask)
 
 object Transformer:
 
-  case class HyperParams[Context, Embedding](
-      postNorm: LayerNorm.HyperParams
-  )
+  def causal[Context: Λ, Embedding: Λ, V: IsFloating](
+      axis: Axis[Context],
+      params: Params[Embedding, V]
+  ): Transformer[Context, Embedding, V] = Transformer(params, causalMask[Context, Context])
+
+  def bidirectional[Context: Λ, Embedding: Λ, V: IsFloating](
+      axis: Axis[Context],
+      params: Params[Embedding, V]
+  ): Transformer[Context, Embedding, V] = Transformer(params, fullMask[Context, Context])
 
   case class Params[Embedding, V](
       transformerLayers: List[TransformerLayer.Params[Embedding, V]],
@@ -51,7 +39,7 @@ object Transformer:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Label, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       new Params[Embedding, V](
         transformerLayers =
           key.split(numTransformerLayers).map: key =>

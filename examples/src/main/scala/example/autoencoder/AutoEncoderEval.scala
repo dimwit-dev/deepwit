@@ -1,7 +1,7 @@
 package deepwit.example.autoencoder
 
-import deepwit.logging.TensorTreeLogger
-import examples.dataset.MNISTLoader
+import deepwit.checkpointing.TensorTreeCheckpointer
+import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.TestSample
 
 import dimwit.*
@@ -50,7 +50,7 @@ def autoEncoderEval(checkpointPath: String) =
 
   val emptyPlaceholderImg = toPyTensor(toImg2D(Tensor.like(original).fill(0f)))
 
-  val logger = new TensorTreeLogger(checkpointPath)
+  val logger = new TensorTreeCheckpointer(checkpointPath)
   val iterations = logger.iterations
 
   // 2. Setup Figure and Subplots

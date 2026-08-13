@@ -2,9 +2,8 @@ package example.gpt
 
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.*
 import Config.*
-import nn.ActivationFunctions.softmax
+import deepwit.base.softmax
 import dimwit.TreeOf.ops.*
 
 import me.shadaj.scalapy.py
@@ -28,9 +27,7 @@ object BPETokenizer:
   println("Loading model checkpoint...")
   val params: GPT.Params[Float32] = ???
 
-  val hyperParams = GPT.HyperParams(Transformer.HyperParams(LayerNorm.HyperParams(1e-12)))
-
-  val model = GPT(hyperParams)(params.asFloats(VType[BFloat16]))
+  val model = GPT(params.asFloats(VType[BFloat16]))
 
   println(s"\nPrompt: $promptText")
   print("Response: ")

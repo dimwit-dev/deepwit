@@ -5,11 +5,12 @@ import dimwit.stats.Normal
 import dimwit.stats.Uniform
 import dimwit.jax.Jax
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor}
+import dimwit.Label as Λ
 
-case class VocabularyEmbedder[Vocab: Label, Embedding: Label, V: IsFloating](params: VocabularyEmbedder.Params[Vocab, Embedding, V]) extends (Tensor0[Int32] => Tensor1[Embedding, V]):
+case class VocabularyEmbedder[Vocab: Λ, Embedding: Λ, V: IsFloating](params: VocabularyEmbedder.Params[Vocab, Embedding, V]) extends (Tensor0[Int32] => Tensor1[Embedding, V]):
 
   override def apply(token: Tensor0[Int32]): Tensor1[Embedding, V] =
-    // params.vocabularyEmbeddings.slice(Axis[Vocab].at(token))
+    // params.vocabularyEmbeddings.slice(Axis[Vocab].at(token)) // TODO
     // params.vocabularyEmbeddings.take(Axis[Vocab])(token)
     val rawJax = Jax.jnp.take(toPyTensor(params.vocabularyEmbeddings), toPyTensor(token), axis = 0)
     liftPyTensor(rawJax)
@@ -23,11 +24,11 @@ object VocabularyEmbedder:
 
   object Params:
 
-    def lecunUniform[Vocab: Label, Embedding: Label, V: IsFloating](vocabExtent: AxisExtent[Vocab], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key, gain: Float = 1.0): Params[Vocab, Embedding, V] =
+    def lecunUniform[Vocab: Λ, Embedding: Λ, V: IsFloating](vocabExtent: AxisExtent[Vocab], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key, gain: Float = 1.0): Params[Vocab, Embedding, V] =
       val variance = Tensor0(vtype)(1.0f / embeddingExtent.size)
       val a = gain * (3f * variance).sqrt
       Params(IndependentDistribution.fromUnivariate(Shape(vocabExtent, embeddingExtent), Uniform(-a, a)).sample(key))
 
-    def lecunNormal[Vocab: Label, Embedding: Label, V: IsFloating](vocabExtent: AxisExtent[Vocab], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key, gain: Float = 1.0): Params[Vocab, Embedding, V] =
+    def lecunNormal[Vocab: Λ, Embedding: Λ, V: IsFloating](vocabExtent: AxisExtent[Vocab], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key, gain: Float = 1.0): Params[Vocab, Embedding, V] =
       val variance = Tensor0(vtype)(1.0f / embeddingExtent.size)
       Params(Normal.standardIsotropic(Shape(vocabExtent, embeddingExtent), scale = gain * variance.sqrt).sample(key))

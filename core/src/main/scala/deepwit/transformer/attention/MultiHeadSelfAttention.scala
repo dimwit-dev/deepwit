@@ -1,39 +1,42 @@
 package deepwit.transformer.attention
 
-import dimwit.*
+import dimwit.{Key as _, *}
 import dimwit.Conversions.given
-import deepwit.base.ActivationFunction.softmax
+import deepwit.base.softmax
 import dimwit.stats.Normal
 import deepwit.base.{AffineLayer, LinearLayer}
 import deepwit.init
+import dimwit.Label as Λ
 
 import me.shadaj.scalapy.py
 import dimwit.python.PyBridge
+import deepwit.transformer.{causalMask, fullMask}
 
-trait MultiHeadSelfAttention[Context: Label, Embedding: Label, V: IsFloating](
-    params: MultiHeadSelfAttention.Params[Embedding, V]
+class MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
+    params: MultiHeadSelfAttention.Params[Embedding, V],
+    createAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
   private val headProjectionLayer = AffineLayer(params.headProjection)
 
   override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     val heads = headAttention(context)
-    heads.vmap(Axis[Context])(heads => headProjection(heads.flatten))
+    heads.vmap(Axis[Context])(heads => headProjectionLayer(heads.flatten))
 
-  protected def headAttention(context: Tensor2[Context, Embedding, V]): Tensor[(Head, Context, HeadValue), V] =
+  private def headAttention(context: Tensor2[Context, Embedding, V]): Tensor[(Head, Context, HeadValue), V] =
     zipvmap(Axis[Head])(params.wq, params.wk, params.wv):
       case (wq, wk, wv) =>
-        selfAttention(SelfAttention.Params(wq, wk, wv))(context)
+        val selfAttentionHead = SelfAttention(SelfAttention.Params(wq, wk, wv), createAttentionMask)
+        selfAttentionHead(context)
 
-  protected def headProjection(headValues: Tensor1[Head |*| HeadValue, V]) = headProjectionLayer(headValues)
-
-  protected def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue, V]): SelfAttention[Context, Embedding, HeadQuery, HeadKey, HeadValue, V]
-
-case class MultiHeadCausalSelfAttention[Context: Label, Embedding: Label, V: IsFloating](
+/*
+TODO reimplement this in new API
+class MultiHeadCausalSelfFlashAttention[Context: Λ, Embedding: Λ, V: IsFloating](
+    axis: Axis[Context],
     params: MultiHeadSelfAttention.Params[Embedding, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](params):
+) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
-  protected override def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue, V]) = CausalSelfAttention(params)
+  private val headProjectionLayer = AffineLayer(params.headProjection)
 
   override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     /** Overwrite with jax.nn.dot_product_attention to enable FlashAttention on CUDA. Roughtly 1.5x faster */
@@ -56,13 +59,7 @@ case class MultiHeadCausalSelfAttention[Context: Label, Embedding: Label, V: IsF
     )
 
     val attended = PyBridge.liftPyTensor(resJax).asInstanceOf[Tensor3[Context, Head, HeadValue, V]]
-    attended.vmap(Axis[Context])(headsForContext => headProjection(headsForContext.flatten))
-
-case class MultiHeadFullSelfAttention[Context: Label, Embedding: Label, V: IsFloating](
-    params: MultiHeadSelfAttention.Params[Embedding, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](params):
-
-  protected override def selfAttention(params: SelfAttention.Params[Embedding, HeadQuery, HeadKey, HeadValue, V]) = FullSelfAttention(params)
+    attended.vmap(Axis[Context])(headsForContext => headProjectionLayer(headsForContext.flatten))*/
 
 object MultiHeadSelfAttention:
 
@@ -75,7 +72,7 @@ object MultiHeadSelfAttention:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Label, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
       val nHeads = headExtent.size
       val headProjectionGain = Math.sqrt(1.0 / (2 * numTransformerLayers)).toFloat

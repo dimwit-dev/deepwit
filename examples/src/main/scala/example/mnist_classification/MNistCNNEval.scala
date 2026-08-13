@@ -1,14 +1,14 @@
 package deepwit.example.mnist_classification
 
-import deepwit.logging.TensorTreeLogger
-import examples.dataset.MNISTLoader
+import deepwit.checkpointing.TensorTreeCheckpointer
+import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.{TestSample, Height, Width}
 
 import dimwit.*
 import dimwit.Conversions.given
 import dimwit.python.PyBridge.toPyTensor
 import deepwit.loss.CategoricalCrossEntropy
-import deepwit.base.ActivationFunction.softmax
+import deepwit.base.softmax
 
 import me.shadaj.scalapy.py
 import me.shadaj.scalapy.py.SeqConverters
@@ -21,8 +21,8 @@ def mnistCNNEval(checkpointPath: String) =
 
   // 1. Setup Data
   val testDataset = MNISTLoader.createTestDataset().get
-  val logger = new TensorTreeLogger(checkpointPath)
-  val iterations = logger.iterations
+  val checkpointer = new TensorTreeCheckpointer(checkpointPath)
+  val iterations = checkpointer.iterations
 
   if iterations.isEmpty then throw new RuntimeException("No checkpoints found!")
 
@@ -45,7 +45,7 @@ def mnistCNNEval(checkpointPath: String) =
 
   // 4. Update Logic
   def updateIteration(it: Int): Unit =
-    val state = logger.load[TrainState](it).get
+    val state = checkpointer.load[TrainState](it).get
     currentModel = MNistCNN(state.params)
 
     // Calculate global metrics for this iteration

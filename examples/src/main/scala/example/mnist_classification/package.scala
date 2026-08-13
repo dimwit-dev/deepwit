@@ -1,7 +1,7 @@
 package deepwit.example
 
 import dimwit.{Label, |*|}
-import examples.dataset.MNISTLoader
+import deepwit.examples.dataset.MNISTLoader
 
 package object mnist_classification:
 
