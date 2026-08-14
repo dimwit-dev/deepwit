@@ -21,7 +21,7 @@ case class AffineLayer[In: Label, Out: Label, V: IsFloating](params: AffineLayer
 
 object AffineLayer:
 
-  /** Holds the learnable weight and bias for an [[AffineLayer]].
+  /** Holds the learnable parameters for an [[AffineLayer]].
     *
     * @param weight The weight matrix.
     * @param bias The bias vector.

@@ -27,7 +27,7 @@ object LinearLayer:
   def apply[In: Label, Out: Label, V: IsFloating](weight: Tensor2[In, Out, V]): LinearLayer[In, Out, V] =
     LinearLayer(LinearLayer.Params(weight))
 
-  /** Holds the learnable weight for a [[LinearLayer]].
+  /** Holds the learnable parameters for a [[LinearLayer]].
     *
     * @param weight The weight matrix.
     */
