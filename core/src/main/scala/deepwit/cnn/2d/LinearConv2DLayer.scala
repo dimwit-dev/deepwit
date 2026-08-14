@@ -14,7 +14,7 @@ case class LinearConv2DLayer[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: I
 
 object LinearConv2DLayer:
 
-  case class Params[S1, S2, InChannel, OutChannel, V: IsFloating](
+  case class Params[S1, S2, InChannel, OutChannel, V](
       kernel: Tensor[(S1, S2, InChannel, OutChannel), V]
   )
 

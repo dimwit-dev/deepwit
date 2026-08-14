@@ -13,3 +13,10 @@ case class CrossTransformer[CrossContext: Λ, CrossEmbedding, Context: Λ, Embed
     val res = layers.foldLeft(context):
       case (context_i, layer) => layer(crossContext, context_i)
     res.vmap(Axis[Context])(postNorm)
+
+  def applyWithHiddenStates(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): (List[Tensor2[Context, Embedding, V]], Tensor2[Context, Embedding, V]) =
+    val allStates = layers.scanLeft(context):
+      case (context_i, layer) => layer(crossContext, context_i)
+    val hiddenStates = allStates.tail // drop initial context
+    val res = hiddenStates.last
+    (hiddenStates, res.vmap(Axis[Context])(postNorm))

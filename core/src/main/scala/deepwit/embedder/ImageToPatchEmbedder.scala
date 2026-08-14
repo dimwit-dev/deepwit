@@ -57,7 +57,7 @@ case class ImageToPatchEmbedder[
 
 object ImageToPatchEmbedder:
 
-  case class Params[PatchWidth, PatchHeight, Channel, PatchEmbedding, V: IsFloating](
+  case class Params[PatchWidth, PatchHeight, Channel, PatchEmbedding, V](
       conv: AffineConv2DLayer.Params[PatchWidth, PatchHeight, Channel, PatchEmbedding, V]
   )
 

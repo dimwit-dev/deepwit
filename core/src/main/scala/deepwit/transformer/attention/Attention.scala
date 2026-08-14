@@ -59,7 +59,7 @@ object Attention:
     val dk = Math.sqrt(keys.shape(Axis[Key]))
     queries.dot(Axis[Query] -> Axis[Key])(keys) /! dk
 
-  case class Params[SourceEmbedding, Embedding, Query, Key, Value, V: IsFloating](
+  case class Params[SourceEmbedding, Embedding, Query, Key, Value, V](
       queryWeights: LinearLayer.Params[Embedding, Query, V],
       keyWeights: LinearLayer.Params[SourceEmbedding, Key, V],
       valueWeights: LinearLayer.Params[SourceEmbedding, Value, V]

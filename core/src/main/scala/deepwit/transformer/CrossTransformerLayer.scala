@@ -49,7 +49,7 @@ object CrossTransformerLayer:
       createSelfAttentionMask = causalMask[Context, Context]
     )
 
-  case class Params[CrossEmbedding, Embedding, V: IsFloating](
+  case class Params[CrossEmbedding, Embedding, V](
       crossAttentionParams: MultiHeadAttention.Params[CrossEmbedding, Embedding, V],
       crossAttentionNormParams: LayerNorm.Params[Embedding, V],
       selfAttentionParams: MultiHeadSelfAttention.Params[Embedding, V],
