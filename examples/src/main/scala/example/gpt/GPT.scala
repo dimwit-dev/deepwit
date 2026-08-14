@@ -98,7 +98,8 @@ object GPT:
       Params(
         embedderParams = VocabularyEmbedder.Params.lecunUniform(vocabExtent, embeddingExtent, vtype, vocabEmbeddingKey),
         positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, vtype, positionalEmbeddingKey),
-        transformer = Transformer.Params.xavierUniformDepthScaled(numTransformerLayers)(
+        transformer = Transformer.Params.xavierUniformDepthScaled(
+          numTransformerLayers,
           headExtent = headExtent,
           headQueryExtent = headQueryExtent,
           headKeyExtent = headKeyExtent,

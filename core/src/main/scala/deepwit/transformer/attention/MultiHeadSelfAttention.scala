@@ -12,22 +12,14 @@ import me.shadaj.scalapy.py
 import dimwit.python.PyBridge
 import deepwit.transformer.{causalMask, fullMask}
 
-class MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
+class MultiHeadSelfAttention[Target: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
-    createAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
-) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
+    createAttentionMask: Shape2[Target, Target] => Tensor2[Target, Target, Bool]
+) extends ((Tensor2[Target, Embedding, V]) => Tensor2[Target, Embedding, V]):
 
-  private val headProjectionLayer = AffineLayer(params.headProjection)
+  private val multiHeadAttention = MultiHeadAttention(MultiHeadAttention.Params(params.queryWeights, params.keyWeights, params.valueWeights, params.headWeights), createAttentionMask)
 
-  override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
-    val heads = headAttention(context)
-    heads.vmap(Axis[Context])(heads => headProjectionLayer(heads.flatten))
-
-  private def headAttention(context: Tensor2[Context, Embedding, V]): Tensor[(Head, Context, HeadValue), V] =
-    zipvmap(Axis[Head])(params.wq, params.wk, params.wv):
-      case (wq, wk, wv) =>
-        val selfAttentionHead = SelfAttention(SelfAttention.Params(wq, wk, wv), createAttentionMask)
-        selfAttentionHead(context)
+  override def apply(context: Tensor2[Target, Embedding, V]): Tensor2[Target, Embedding, V] = multiHeadAttention(context, context)
 
 /*
 TODO reimplement this in new API
@@ -64,21 +56,20 @@ class MultiHeadCausalSelfFlashAttention[Context: Λ, Embedding: Λ, V: IsFloatin
 object MultiHeadSelfAttention:
 
   case class Params[Embedding, V](
-      wq: Tensor3[Head, Embedding, HeadQuery, V],
-      wk: Tensor3[Head, Embedding, HeadKey, V],
-      wv: Tensor3[Head, Embedding, HeadValue, V],
-      headProjection: AffineLayer.Params[Head |*| HeadValue, Embedding, V]
+      queryWeights: Tensor3[Head, Embedding, HeadQuery, V],
+      keyWeights: Tensor3[Head, Embedding, HeadKey, V],
+      valueWeights: Tensor3[Head, Embedding, HeadValue, V],
+      headWeights: AffineLayer.Params[Head |*| HeadValue, Embedding, V]
   )
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+      import MultiHeadAttention.Params.{xavierUniformHeads, xavierUniformHeadWeights}
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
-      val nHeads = headExtent.size
-      val headProjectionGain = Math.sqrt(1.0 / (2 * numTransformerLayers)).toFloat
       Params(
-        wq = stack(queryKey.split(nHeads).map(key => init.xavierUniform(embeddingExtent, headQueryExtent, vtype, key)), Axis[Head]),
-        wk = stack(keyKey.split(nHeads).map(key => init.xavierUniform(embeddingExtent, headKeyExtent, vtype, key)), Axis[Head]),
-        wv = stack(valueKey.split(nHeads).map(key => init.xavierUniform(embeddingExtent, headValueExtent, vtype, key)), Axis[Head]),
-        headProjection = AffineLayer.Params.xavierUniform(headExtent * headValueExtent, embeddingExtent, vtype, projectionKey, gain = headProjectionGain)
+        queryWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headQueryExtent, vtype, queryKey),
+        keyWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headKeyExtent, vtype, keyKey),
+        valueWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headValueExtent, vtype, valueKey),
+        headWeights = xavierUniformHeadWeights(numTransformerLayers, headExtent * headValueExtent, embeddingExtent, vtype, projectionKey)
       )

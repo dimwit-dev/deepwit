@@ -3,7 +3,7 @@ package deepwit.transformer
 import dimwit.*
 import deepwit.normalization.LayerNorm
 import dimwit.Label as Λ
-import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadCrossAttention}
+import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue, MultiHeadSelfAttention, MultiHeadAttention}
 
 class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedding: Λ, V: IsFloating](
     params: CrossTransformerLayer.Params[CrossEmbedding, Embedding, V],
@@ -14,7 +14,7 @@ class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, E
   private val selfAttention = MultiHeadSelfAttention[Context, Embedding, V](params.selfAttentionParams, createSelfAttentionMask)
   private val selfAttentionPreNorm = LayerNorm(params.selfAttentionNormParams)
 
-  private val crossAttention = new MultiHeadCrossAttention(params.crossAttentionParams, createCrossAttentionMask)
+  private val crossAttention = new MultiHeadAttention(params.crossAttentionParams, createCrossAttentionMask)
   private val crossAttentionPreNorm = LayerNorm(params.crossAttentionNormParams)
 
   private val mlp = MLPEmbeddingMixer(params.mlpParams)
@@ -27,13 +27,13 @@ class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, E
     x = x + x.vmap(Axis[Context])(embeddingMixer)
     x
 
-  protected def embeddingMixer(embeddings: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
+  private def embeddingMixer(embeddings: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
     mlp(mlpPreNorm(embeddings))
 
-  protected def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+  private def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     selfAttention(context.vmap(Axis[Context])(selfAttentionPreNorm))
 
-  protected def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+  private def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     crossAttention(crossContext, context.vmap(Axis[Context])(crossAttentionPreNorm))
 
 object CrossTransformerLayer:
@@ -50,7 +50,7 @@ object CrossTransformerLayer:
     )
 
   case class Params[CrossEmbedding, Embedding, V: IsFloating](
-      crossAttentionParams: MultiHeadCrossAttention.Params[CrossEmbedding, Embedding, V],
+      crossAttentionParams: MultiHeadAttention.Params[CrossEmbedding, Embedding, V],
       crossAttentionNormParams: LayerNorm.Params[Embedding, V],
       selfAttentionParams: MultiHeadSelfAttention.Params[Embedding, V],
       selfAttentionNormParams: LayerNorm.Params[Embedding, V],
@@ -63,9 +63,9 @@ object CrossTransformerLayer:
     def xavierUniformDepthScaled[CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
       val (selfAttnKey, crossAttnKey, mixKey) = key.splitToTuple(3)
       new Params[CrossEmbedding, Embedding, V](
-        crossAttentionParams = MultiHeadCrossAttention.Params.xavierUniformDepthScaled(numTransformerLayers)(headExtent, headQueryExtent, headKeyExtent, headValueExtent, crossEmbeddingExtent, embeddingExtent, vtype, crossAttnKey),
+        crossAttentionParams = MultiHeadAttention.Params.xavierUniformDepthScaled(numTransformerLayers, headExtent, headQueryExtent, headKeyExtent, headValueExtent, crossEmbeddingExtent, embeddingExtent, vtype, crossAttnKey),
         crossAttentionNormParams = LayerNorm.Params.identity(embeddingExtent, vtype),
-        selfAttentionParams = MultiHeadSelfAttention.Params.xavierUniformDepthScaled(numTransformerLayers)(headExtent, headQueryExtent, headKeyExtent, headValueExtent, embeddingExtent, vtype, selfAttnKey),
+        selfAttentionParams = MultiHeadSelfAttention.Params.xavierUniformDepthScaled(numTransformerLayers, headExtent, headQueryExtent, headKeyExtent, headValueExtent, embeddingExtent, vtype, selfAttnKey),
         selfAttentionNormParams = LayerNorm.Params.identity(embeddingExtent, vtype),
         mlpParams = MLPEmbeddingMixer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, vtype, mixKey),
         mlpNormParams = LayerNorm.Params.identity(embeddingExtent, vtype)

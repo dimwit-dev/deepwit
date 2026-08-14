@@ -39,11 +39,11 @@ object Transformer:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       new Params[Embedding, V](
         transformerLayers =
           key.split(numTransformerLayers).map: key =>
-            TransformerLayer.Params.xavierUniformDepthScaled(numTransformerLayers)(headExtent, headQueryExtent, headKeyExtent, headValueExtent, embeddingExtent, embeddingMixedExtent, vtype, key)
+            TransformerLayer.Params.xavierUniformDepthScaled(numTransformerLayers, headExtent, headQueryExtent, headKeyExtent, headValueExtent, embeddingExtent, embeddingMixedExtent, vtype, key)
           .toList,
         postNorm = LayerNorm.Params.identity(embeddingExtent, vtype)
       )
