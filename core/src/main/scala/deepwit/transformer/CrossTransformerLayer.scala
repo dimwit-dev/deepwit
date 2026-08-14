@@ -38,17 +38,6 @@ class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, E
 
 object CrossTransformerLayer:
 
-  def apply[CrossContext: Λ, Context: Λ, CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](
-      axis: Axis[Context],
-      crossAxis: Axis[CrossContext],
-      params: Params[CrossEmbedding, Embedding, V]
-  ): CrossTransformerLayer[CrossContext, CrossEmbedding, Context, Embedding, V] =
-    new CrossTransformerLayer(
-      params,
-      createCrossAttentionMask = fullMask[Context, CrossContext],
-      createSelfAttentionMask = causalMask[Context, Context]
-    )
-
   case class Params[CrossEmbedding, Embedding, V](
       crossAttentionParams: MultiHeadAttention.Params[CrossEmbedding, Embedding, V],
       crossAttentionNormParams: LayerNorm.Params[Embedding, V],
@@ -60,12 +49,19 @@ object CrossTransformerLayer:
 
   object Params:
 
-    def xavierUniformDepthScaled[CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int)(headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
+    def xavierUniformDepthScaled[CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, crossEmbeddingExtent: AxisExtent[CrossEmbedding], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[CrossEmbedding, Embedding, V] =
       val (selfAttnKey, crossAttnKey, mixKey) = key.splitToTuple(3)
+      val headExtent = Axis[Head] -> numHeads
+      val headCrossQueryExtent = Axis[HeadQuery] -> crossEmbeddingExtent.size / numHeads
+      val headCrossKeyExtent = Axis[HeadKey] -> crossEmbeddingExtent.size / numHeads
+      val headCrossValueExtent = Axis[HeadValue] -> crossEmbeddingExtent.size / numHeads
+      val headQueryExtent = Axis[HeadQuery] -> embeddingExtent.size / numHeads
+      val headKeyExtent = Axis[HeadKey] -> embeddingExtent.size / numHeads
+      val headValueExtent = Axis[HeadValue] -> embeddingExtent.size / numHeads
       new Params[CrossEmbedding, Embedding, V](
-        crossAttentionParams = MultiHeadAttention.Params.xavierUniformDepthScaled(numTransformerLayers, headExtent, headQueryExtent, headKeyExtent, headValueExtent, crossEmbeddingExtent, embeddingExtent, vtype, crossAttnKey),
+        crossAttentionParams = MultiHeadAttention.Params.xavierUniformDepthScaled(numTransformerLayers, numHeads, crossEmbeddingExtent, embeddingExtent, vtype, crossAttnKey),
         crossAttentionNormParams = LayerNorm.Params.identity(embeddingExtent, vtype),
-        selfAttentionParams = MultiHeadSelfAttention.Params.xavierUniformDepthScaled(numTransformerLayers, headExtent, headQueryExtent, headKeyExtent, headValueExtent, embeddingExtent, vtype, selfAttnKey),
+        selfAttentionParams = MultiHeadSelfAttention.Params.xavierUniformDepthScaled(numTransformerLayers, numHeads, embeddingExtent, vtype, selfAttnKey),
         selfAttentionNormParams = LayerNorm.Params.identity(embeddingExtent, vtype),
         mlpParams = MLPEmbeddingMixer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, vtype, mixKey),
         mlpNormParams = LayerNorm.Params.identity(embeddingExtent, vtype)

@@ -40,10 +40,10 @@ object TransformerLayer:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       val (attnKey, mixKey) = key.splitToTuple(2)
       new Params[Embedding, V](
-        attentionParams = MultiHeadSelfAttention.Params.xavierUniformDepthScaled(numTransformerLayers, headExtent, headQueryExtent, headKeyExtent, headValueExtent, embeddingExtent, vtype, attnKey),
+        attentionParams = MultiHeadSelfAttention.Params.xavierUniformDepthScaled(numTransformerLayers, numHeads, embeddingExtent, vtype, attnKey),
         attentionNormParams = LayerNorm.Params.identity(embeddingExtent, vtype),
         mlpParams = MLPEmbeddingMixer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, vtype, mixKey),
         mlpNormParams = LayerNorm.Params.identity(embeddingExtent, vtype)

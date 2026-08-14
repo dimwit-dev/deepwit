@@ -44,11 +44,17 @@ object MultiHeadAttention:
       val gain = Math.sqrt(1.0 / (2 * numLayers)).toFloat
       AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, vtype, key, gain = gain)
 
-    def xavierUniformDepthScaled[SourceEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int, headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], crossEmbeddingExtent: AxisExtent[SourceEmbedding], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[SourceEmbedding, Embedding, V] =
+    def xavierUniformDepthScaled[SourceEmbedding: Λ, Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, crossEmbeddingExtent: AxisExtent[SourceEmbedding], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[SourceEmbedding, Embedding, V] =
+      require(embeddingExtent.size % numHeads == 0)
+      require(crossEmbeddingExtent.size % numHeads == 0)
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
+      val headExtent = Axis[Head] -> numHeads
+      val headCrossKeyExtent = Axis[HeadKey] -> crossEmbeddingExtent.size / numHeads
+      val headCrossValueExtent = Axis[HeadValue] -> crossEmbeddingExtent.size / numHeads
+      val headQueryExtent = Axis[HeadQuery] -> embeddingExtent.size / numHeads
       Params(
         queryWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headQueryExtent, vtype, queryKey),
-        keyWeights = xavierUniformHeads(headExtent.size, crossEmbeddingExtent, headKeyExtent, vtype, keyKey),
-        valueWeights = xavierUniformHeads(headExtent.size, crossEmbeddingExtent, headValueExtent, vtype, valueKey),
-        headWeights = xavierUniformHeadWeights(numTransformerLayers, headExtent * headValueExtent, embeddingExtent, vtype, projectionKey)
+        keyWeights = xavierUniformHeads(headExtent.size, crossEmbeddingExtent, headCrossKeyExtent, vtype, keyKey),
+        valueWeights = xavierUniformHeads(headExtent.size, crossEmbeddingExtent, headCrossValueExtent, vtype, valueKey),
+        headWeights = xavierUniformHeadWeights(numTransformerLayers, headExtent * headCrossValueExtent, embeddingExtent, vtype, projectionKey)
       )

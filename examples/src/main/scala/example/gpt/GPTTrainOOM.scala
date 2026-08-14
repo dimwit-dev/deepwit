@@ -46,11 +46,8 @@ object BACKUP:
     val numLayers = 12
     val vocabExtent = Axis[Vocab] -> 50304
     val contextExtent = Axis[Context] -> 1024
-    val embeddingExtent = Axis[Embedding] -> 768
-    val headExtent = Axis[Head] -> 12
-    val headQueryExtent = Axis[HeadQuery] -> 64
-    val headKeyExtent = Axis[HeadKey] -> 64
-    val headValueExtent = Axis[HeadValue] -> 64
+    val numHeads = 12
+    val embeddingExtent = Axis[Embedding] -> 64 * numHeads
     val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 3072
 
     val valTokens = 10485760
@@ -68,11 +65,8 @@ object BACKUP:
     val numLayers = 2
     val vocabExtent = Axis[Vocab] -> 50257
     val contextExtent = Axis[Context] -> 32
-    val embeddingExtent = Axis[Embedding] -> 128
-    val headExtent = Axis[Head] -> 4
-    val headQueryExtent = Axis[HeadQuery] -> 32
-    val headKeyExtent = Axis[HeadKey] -> 32
-    val headValueExtent = Axis[HeadValue] -> 32
+    val numHeads = 4
+    val embeddingExtent = Axis[Embedding] -> 32 * numHeads
     val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 512
 
   import Config.*
@@ -89,10 +83,7 @@ object BACKUP:
     val initParams = GPT.Params.init(numTransformerLayers = numLayers)(
       vocabExtent,
       contextExtent,
-      headExtent,
-      headQueryExtent,
-      headKeyExtent,
-      headValueExtent,
+      numHeads,
       embeddingExtent,
       embeddingMixedExtent,
       VType[Float32],

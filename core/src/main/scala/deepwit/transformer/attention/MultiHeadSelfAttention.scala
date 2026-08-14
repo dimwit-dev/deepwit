@@ -11,6 +11,7 @@ import dimwit.Label as Λ
 import me.shadaj.scalapy.py
 import dimwit.python.PyBridge
 import deepwit.transformer.{causalMask, fullMask}
+import deepwit.transformer.MLPEmbeddingMixer
 
 class MultiHeadSelfAttention[Target: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
@@ -64,9 +65,14 @@ object MultiHeadSelfAttention:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, headExtent: AxisExtent[Head], headQueryExtent: AxisExtent[HeadQuery], headKeyExtent: AxisExtent[HeadKey], headValueExtent: AxisExtent[HeadValue], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+      require(embeddingExtent.size % numHeads == 0)
       import MultiHeadAttention.Params.{xavierUniformHeads, xavierUniformHeadWeights}
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
+      val headExtent = Axis[Head] -> numHeads
+      val headQueryExtent = Axis[HeadQuery] -> embeddingExtent.size / numHeads
+      val headKeyExtent = Axis[HeadKey] -> embeddingExtent.size / numHeads
+      val headValueExtent = Axis[HeadValue] -> embeddingExtent.size / numHeads
       Params(
         queryWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headQueryExtent, vtype, queryKey),
         keyWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headKeyExtent, vtype, keyKey),

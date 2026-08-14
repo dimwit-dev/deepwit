@@ -84,10 +84,7 @@ object GPT:
     def init[V: IsFloating](numTransformerLayers: Int)(
         vocabExtent: AxisExtent[Vocab],
         contextExtent: AxisExtent[Context],
-        headExtent: AxisExtent[Head],
-        headQueryExtent: AxisExtent[HeadQuery],
-        headKeyExtent: AxisExtent[HeadKey],
-        headValueExtent: AxisExtent[HeadValue],
+        numHeads: Int,
         embeddingExtent: AxisExtent[Embedding],
         embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed],
         vtype: VType[V],
@@ -100,10 +97,7 @@ object GPT:
         positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, vtype, positionalEmbeddingKey),
         transformer = Transformer.Params.xavierUniformDepthScaled(
           numTransformerLayers,
-          headExtent = headExtent,
-          headQueryExtent = headQueryExtent,
-          headKeyExtent = headKeyExtent,
-          headValueExtent = headValueExtent,
+          numHeads,
           embeddingExtent = embeddingExtent,
           embeddingMixedExtent = embeddingMixedExtent,
           vtype = vtype,
