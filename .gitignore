@@ -16,3 +16,9 @@ project/project/**
 ide-*.json
 *.bak
 .envrc
+
+examples/target/*
+core/target/*
+pyproject.toml
+uv.lock
+.dimwit-docs-root
