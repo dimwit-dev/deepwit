@@ -1,3 +1,6 @@
+import ai.kien.python.Python
+import scala.sys.process._
+
 run / fork := true
 Global / cancelable := true
 
@@ -55,4 +58,30 @@ lazy val examples = (project in file("examples"))
         Seq.empty
       }
     }
+  )
+
+lazy val uvPython: String =
+  sys.env.getOrElse(
+    "DIMWIT_PYTHON_PATH",
+    Seq("uv", "run", "--no-sync", "python", "-c", "import sys; print(sys.executable)").!!.trim
+  )
+lazy val python = Python(uvPython)
+lazy val scalapyJavaOptions = python.scalapyProperties.get.map { case (k, v) => s"-D$k=$v" }.toSeq
+
+// Processes files in /mdocs that need to be copied to the root (e.g. README.md)
+lazy val docsRoot = (project in file(".dimwit-docs-root"))
+  .enablePlugins(MdocPlugin)
+  .dependsOn(core)
+  .settings(
+    name := "dimwit-docs-root",
+    publish / skip := true,
+    mdocIn := (ThisBuild / baseDirectory).value / "mdocs",
+    mdocOut := (ThisBuild / baseDirectory).value,
+    mdocExtraArguments := Seq("--no-link-hygiene"),
+    mdocVariables := Map(
+      "VERSION" -> version.value
+    ),
+    fork := true,
+    javaOptions ++= scalapyJavaOptions,
+    envVars := (ThisBuild / envVars).value
   )
