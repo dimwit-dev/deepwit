@@ -1,6 +1,7 @@
 package deepwit.base
 
 import dimwit.*
+import dimwit.Label as Λ
 
 /** Represents a learnable affine transformation.
   *
@@ -14,7 +15,7 @@ import dimwit.*
   * @tparam V The floating-point scalar type of the tensor elements.
   * @param params The layer parameters.
   */
-case class AffineLayer[In: Label, Out: Label, V: IsFloating](params: AffineLayer.Params[In, Out, V]) extends (Tensor1[In, V] => Tensor1[Out, V]):
+class AffineLayer[In: Λ, Out: Λ, V: IsFloating](params: AffineLayer.Params[In, Out, V]) extends (Tensor1[In, V] => Tensor1[Out, V]):
 
   override def apply(x: Tensor1[In, V]): Tensor1[Out, V] =
     x.dot(Axis[In])(params.weight) + params.bias
@@ -33,19 +34,19 @@ object AffineLayer:
 
   object Params:
 
-    def identity[In: Label, V: IsFloating](extent: AxisExtent[In], vtype: VType[V]): Params[In, Prime[In], V] =
+    def identity[In: Λ, V: IsFloating](extent: AxisExtent[In], vtype: VType[V]): Params[In, Prime[In], V] =
       Params(
         weight = Tensor2.eye(extent, vtype),
         bias = Tensor(Shape(Axis[Prime[In]] -> extent.size), vtype).fill(0f)
       )
 
-    def xavierNormal[In: Label, Out: Label, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
       Params(
         weight = deepwit.init.xavierNormal(inExtent, outExtent, vtype, key, gain = gain),
         bias = Tensor(Shape(outExtent), vtype).fill(0f)
       )
 
-    def xavierUniform[In: Label, Out: Label, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
       Params(
         weight = deepwit.init.xavierUniform(inExtent, outExtent, vtype, key, gain = gain),
         bias = Tensor(Shape(outExtent), vtype).fill(0f)

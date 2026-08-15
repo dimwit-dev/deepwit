@@ -1,26 +1,28 @@
 package deepwit.transformer.attention
 
-import dimwit.{Key as _, *}
-import dimwit.Conversions.given
-import deepwit.base.softmax
-import dimwit.stats.Normal
-import deepwit.base.{AffineLayer, LinearLayer}
-import deepwit.init
+import dimwit.*
+import deepwit.base.AffineLayer
 import dimwit.Label as Λ
 
-import me.shadaj.scalapy.py
-import dimwit.python.PyBridge
-import deepwit.transformer.{causalMask, fullMask}
-import deepwit.transformer.MLPEmbeddingMixer
-
+/** Represents multi-head self-attention, i.e. multi-head attention of a sequence onto itself.
+  *
+  * @tparam Target The axis label for the sequence.
+  * @tparam Embedding The axis label for the embedding space.
+  * @tparam V The floating-point scalar type of the tensor elements.
+  * @param params The learnable parameters.
+  * @param createAttentionMask A function generating a boolean mask to prevent attention to certain positions.
+  */
 class MultiHeadSelfAttention[Target: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
     createAttentionMask: Shape2[Target, Target] => Tensor2[Target, Target, Bool]
-) extends ((Tensor2[Target, Embedding, V]) => Tensor2[Target, Embedding, V]):
+) extends (Tensor2[Target, Embedding, V] => Tensor2[Target, Embedding, V]):
 
-  private val multiHeadAttention = MultiHeadAttention(MultiHeadAttention.Params(params.queryWeights, params.keyWeights, params.valueWeights, params.headWeights), createAttentionMask)
+  private val multiHeadAttention = MultiHeadAttention(
+    MultiHeadAttention.Params(params.queryWeights, params.keyWeights, params.valueWeights, params.outputProjection),
+    createAttentionMask
+  )
 
-  override def apply(context: Tensor2[Target, Embedding, V]): Tensor2[Target, Embedding, V] = multiHeadAttention(context, context)
+  override def apply(target: Tensor2[Target, Embedding, V]): Tensor2[Target, Embedding, V] = multiHeadAttention(target, target)
 
 /*
 TODO reimplement this in new API
@@ -60,14 +62,14 @@ object MultiHeadSelfAttention:
       queryWeights: Tensor3[Head, Embedding, HeadQuery, V],
       keyWeights: Tensor3[Head, Embedding, HeadKey, V],
       valueWeights: Tensor3[Head, Embedding, HeadValue, V],
-      headWeights: AffineLayer.Params[Head |*| HeadValue, Embedding, V]
+      outputProjection: AffineLayer.Params[Head |*| HeadValue, Embedding, V]
   )
 
   object Params:
 
     def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
       require(embeddingExtent.size % numHeads == 0)
-      import MultiHeadAttention.Params.{xavierUniformHeads, xavierUniformHeadWeights}
+      import MultiHeadAttention.Params.{xavierUniformHeads, xavierUniformOutputProjection}
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
       val headExtent = Axis[Head] -> numHeads
       val headQueryExtent = Axis[HeadQuery] -> embeddingExtent.size / numHeads
@@ -77,5 +79,5 @@ object MultiHeadSelfAttention:
         queryWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headQueryExtent, vtype, queryKey),
         keyWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headKeyExtent, vtype, keyKey),
         valueWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headValueExtent, vtype, valueKey),
-        headWeights = xavierUniformHeadWeights(numTransformerLayers, headExtent * headValueExtent, embeddingExtent, vtype, projectionKey)
+        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, embeddingExtent, vtype, projectionKey)
       )

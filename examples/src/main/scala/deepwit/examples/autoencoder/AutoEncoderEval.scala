@@ -1,4 +1,4 @@
-package deepwit.example.autoencoder
+package deepwit.examples.autoencoder
 
 import deepwit.checkpointing.TensorTreeCheckpointer
 import deepwit.examples.dataset.MNISTLoader

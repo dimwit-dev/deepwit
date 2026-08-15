@@ -1,4 +1,4 @@
-package example.gpt
+package deepwit.examples.gpt
 
 import dimwit.*
 import dimwit.Conversions.given
@@ -6,14 +6,13 @@ import nn.ActivationFunctions.softmax
 import deepwit.*
 import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue}
 import dimwit.stats.Categorical
-import scala.CanEqual.derived
 import deepwit.embedder.VocabularyEmbedder
 import deepwit.embedder.LearnedAbsolutePositionalInjector
 import deepwit.base.LinearLayer
 import deepwit.transformer.Transformer
-import deepwit.transformer.MLPEmbeddingMixer
+import deepwit.transformer.EmbeddingMixed
 
-case class GPT[V: IsFloating](params: GPT.Params[V]):
+class GPT[V: IsFloating](params: GPT.Params[V]):
 
   private val embedder = VocabularyEmbedder(params.embedderParams)
   private val positionalInjector = LearnedAbsolutePositionalInjector(params.positionalInjectorParams)
@@ -86,7 +85,7 @@ object GPT:
         contextExtent: AxisExtent[Context],
         numHeads: Int,
         embeddingExtent: AxisExtent[Embedding],
-        embeddingMixedExtent: AxisExtent[MLPEmbeddingMixer.EmbeddingMixed],
+        embeddingMixedExtent: AxisExtent[EmbeddingMixed],
         vtype: VType[V],
         key: Random.Key
     ): Params[V] =

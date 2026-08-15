@@ -7,7 +7,7 @@ import dimwit.jax.Jax
 import dimwit.python.PyBridge.{toPyTensor, liftPyTensor}
 import dimwit.Label as Λ
 
-case class VocabularyEmbedder[Vocab: Λ, Embedding: Λ, V: IsFloating](params: VocabularyEmbedder.Params[Vocab, Embedding, V]) extends (Tensor0[Int32] => Tensor1[Embedding, V]):
+class VocabularyEmbedder[Vocab: Λ, Embedding: Λ, V: IsFloating](params: VocabularyEmbedder.Params[Vocab, Embedding, V]) extends (Tensor0[Int32] => Tensor1[Embedding, V]):
 
   override def apply(token: Tensor0[Int32]): Tensor1[Embedding, V] =
     // params.vocabularyEmbeddings.slice(Axis[Vocab].at(token)) // TODO

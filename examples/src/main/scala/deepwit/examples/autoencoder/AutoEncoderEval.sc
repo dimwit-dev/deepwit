@@ -1,9 +1,9 @@
 import dimwit.*
 import dimwit.Conversions.given
 import deepwit.logging.TensorTreeLogger
-import deepwit.example.autoencoder.*
+import deepwit.examples.autoencoder.*
 
-import examples.dataset.MNISTLoader
+import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.TestSample
 
 import plotwit.plotting.Plotting

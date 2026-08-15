@@ -3,7 +3,6 @@ package deepwit.checkpointing
 import java.nio.file.Path
 import dimwit.tensortree.TensorTree
 import dimwit.tensortree.{TensorTreeIO, TensorTreeFormat}
-import java.io.FileNotFoundException
 
 class TensorTreeCheckpointer(
     private val rootPath: String,

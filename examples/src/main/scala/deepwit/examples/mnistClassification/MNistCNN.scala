@@ -1,7 +1,6 @@
-package deepwit.example.mnist_classification
+package deepwit.examples.mnistClassification
 
 import dimwit.*
-import dimwit.Conversions.given
 
 import deepwit.base.{AffineLayer, relu}
 import deepwit.cnn.AffineConv2DLayer
@@ -33,7 +32,7 @@ object MNistCNN:
         output = AffineLayer.Params.xavierUniform(embeddingDim, outputDim, VType[Float32], outputKey)
       )
 
-case class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):
+class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):
   private val conv1 = AffineConv2DLayer(params.conv1, stride = 2, padding = Padding.SAME)
   private val conv2 = AffineConv2DLayer(params.conv2, stride = 2, padding = Padding.SAME)
   private val output = AffineLayer(params.output)

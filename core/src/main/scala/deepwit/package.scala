@@ -1,4 +1,3 @@
-import scala.languageFeature.experimental.macros
 package object deepwit:
 
   trait Monitor[S]:

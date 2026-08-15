@@ -1,12 +1,12 @@
-package example.gpt
+package deepwit.examples.gpt
 
 import java.io.File
 import dimwit.*
 import dimwit.Conversions.given
-import dimwit.python.PyBridge.{liftPyTensor, liftPyTensor1}
+import dimwit.python.PyBridge.liftPyTensor
 import me.shadaj.scalapy.py
 import dimwit.stats.Uniform
-import dimwit.hardware.DeviceBackend.{CPU, GPU}
+import dimwit.hardware.DeviceBackend.GPU
 
 object FineWebDataset:
 
@@ -57,6 +57,8 @@ object FineWebDataset:
       val batchesInShard = shardTokens / (batchSize * contextLength)
 
       // Using an iterator here to generate batches without caching
+      // TODO The key stream restarts from initialKey for every shard, so every shard replays the
+      //      identical sequence of sample offsets. Thread one key stream through all shards instead.
       Iterator.iterate(initialKey)(_.split2()._2) // Infinite stream of keys
         .map(key => loadBatch(data, batchSize, contextLength, key))
         .take(batchesInShard)

@@ -2,6 +2,7 @@ package deepwit.base
 
 import dimwit.*
 import deepwit.init
+import dimwit.Label as Λ
 
 /** Represents a learnable linear form.
   *
@@ -14,18 +15,21 @@ import deepwit.init
   * @tparam V The floating-point scalar type of the tensor elements.
   * @param params The layer parameters.
   */
-case class LinearFormLayer[In: Label, V: IsFloating](params: LinearFormLayer.Params[In, V]) extends (Tensor1[In, V] => Tensor0[V]):
+class LinearFormLayer[In: Λ, V: IsFloating](params: LinearFormLayer.Params[In, V]) extends (Tensor1[In, V] => Tensor0[V]):
   override def apply(x: Tensor1[In, V]): Tensor0[V] =
     x.dot(Axis[In])(params.weight)
 
 object LinearFormLayer:
 
+  def apply[In: Λ, V: IsFloating](params: LinearFormLayer.Params[In, V]): LinearFormLayer[In, V] =
+    new LinearFormLayer(params)
+
   /** Creates a [[LinearFormLayer]] directly from a given weight vector.
     *
     * @param weight The weight vector.
     */
-  def apply[In: Label, V: IsFloating](weight: Tensor1[In, V]): LinearFormLayer[In, V] =
-    LinearFormLayer(LinearFormLayer.Params(weight))
+  def apply[In: Λ, V: IsFloating](weight: Tensor1[In, V]): LinearFormLayer[In, V] =
+    new LinearFormLayer(LinearFormLayer.Params(weight))
 
   /** Holds the learnable parameters for a [[LinearFormLayer]].
     *
@@ -35,8 +39,8 @@ object LinearFormLayer:
 
   object Params:
 
-    def xavierNormal[In: Label, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
+    def xavierNormal[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
       Params(weight = init.xavierNormalVector(inExtent, vtype, key, gain = gain))
 
-    def xavierUniform[In: Label, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
+    def xavierUniform[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
       Params(weight = init.xavierUniformVector(inExtent, vtype, key, gain = gain))

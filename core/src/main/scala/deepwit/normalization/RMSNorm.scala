@@ -2,12 +2,11 @@ package deepwit.normalization
 
 import dimwit.*
 import dimwit.Conversions.given
-import dimwit.jax.Jax
 import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
-case class RMSNorm[L: Λ, V: IsFloating](
+class RMSNorm[L: Λ, V: IsFloating](
     params: RMSNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon
 ) extends (Tensor1[L, V] => Tensor1[L, V]):
@@ -16,8 +15,9 @@ case class RMSNorm[L: Λ, V: IsFloating](
 
   def apply(x: Tensor1[L, V]): Tensor1[L, V] =
     def rescale(x: Tensor1[L, V]): Tensor1[L, V] =
-      val variance = (x -! x.mean).pow(2).mean
-      x /! (variance + ε).sqrt
+      // Unlike LayerNorm, RMSNorm does not re-center: it only divides by the root mean square.
+      val meanSquare = x.pow(2).mean
+      x /! (meanSquare + ε).sqrt
     rescale(x) * params.weight
 
 object RMSNorm:

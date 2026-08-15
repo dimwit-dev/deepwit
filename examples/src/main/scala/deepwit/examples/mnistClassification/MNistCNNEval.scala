@@ -1,11 +1,10 @@
-package deepwit.example.mnist_classification
+package deepwit.examples.mnistClassification
 
 import deepwit.checkpointing.TensorTreeCheckpointer
 import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.{TestSample, Height, Width}
 
 import dimwit.*
-import dimwit.Conversions.given
 import dimwit.python.PyBridge.toPyTensor
 import deepwit.loss.CategoricalCrossEntropy
 import deepwit.base.softmax

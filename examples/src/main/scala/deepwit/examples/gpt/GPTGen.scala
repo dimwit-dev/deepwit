@@ -1,15 +1,11 @@
-package example.gpt
+package deepwit.examples.gpt
 
 import dimwit.*
-import dimwit.Conversions.given
 import Config.*
-import deepwit.base.softmax
 import dimwit.TreeOf.ops.*
 
 import me.shadaj.scalapy.py
 import me.shadaj.scalapy.py.SeqConverters
-import dimwit.optimizer.Adam
-import dimwit.optimizer.AdamW
 
 object BPETokenizer:
   private val tiktoken = py.module("tiktoken")

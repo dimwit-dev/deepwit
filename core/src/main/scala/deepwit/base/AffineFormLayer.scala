@@ -1,6 +1,7 @@
 package deepwit.base
 
 import dimwit.*
+import dimwit.Label as Λ
 import deepwit.init
 
 /** Represents a learnable affine form.
@@ -14,7 +15,7 @@ import deepwit.init
   * @tparam V The floating-point scalar type of the tensor elements.
   * @param params The layer parameters.
   */
-case class AffineFormLayer[In: Label, V: IsFloating](params: AffineFormLayer.Params[In, V]) extends (Tensor1[In, V] => Tensor0[V]):
+class AffineFormLayer[In: Λ, V: IsFloating](params: AffineFormLayer.Params[In, V]) extends (Tensor1[In, V] => Tensor0[V]):
   override def apply(x: Tensor1[In, V]): Tensor0[V] =
     x.dot(Axis[In])(params.weight) + params.bias
 
@@ -32,13 +33,13 @@ object AffineFormLayer:
 
   object Params:
 
-    def xavierNormal[In: Label, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
+    def xavierNormal[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
       Params(
         weight = init.xavierNormalVector(inExtent, vtype, key, gain = gain),
         bias = Tensor0(vtype)(0f)
       )
 
-    def xavierUniform[In: Label, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
+    def xavierUniform[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
       Params(
         weight = init.xavierUniformVector(inExtent, vtype, key, gain = gain),
         bias = Tensor0(vtype)(0f)

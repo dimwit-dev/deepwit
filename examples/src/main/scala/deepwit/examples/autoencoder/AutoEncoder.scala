@@ -1,12 +1,11 @@
-package deepwit.example.autoencoder
+package deepwit.examples.autoencoder
 
 import dimwit.*
-import dimwit.Conversions.given
 
 import deepwit.base.AffineLayer
 import deepwit.base.{relu, sigmoid}
 
-case class Autoencoder(params: Autoencoder.Params):
+class Autoencoder(params: Autoencoder.Params):
 
   val encoder = Autoencoder.Encoder(params.encoderParams)
   val decoder = Autoencoder.Decoder(params.decoderParams)

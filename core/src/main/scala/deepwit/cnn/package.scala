@@ -1,6 +1,5 @@
 package deepwit
 
-import dimwit.tensor.AxisExtent
 
 package object cnn:
   // 2D Convolutions

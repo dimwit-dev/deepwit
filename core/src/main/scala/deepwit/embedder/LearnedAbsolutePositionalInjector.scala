@@ -4,7 +4,15 @@ import dimwit.*
 import dimwit.stats.{Normal, Uniform}
 import dimwit.Label as Λ
 
-case class LearnedAbsolutePositionalInjector[Context: Λ, Embedding: Λ, V: IsFloating](params: LearnedAbsolutePositionalInjector.Params[Context, Embedding, V]) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
+/** Adds a learned absolute positional embedding to every element of a sequence.
+  *
+  * @tparam Context The axis label for the sequence.
+  * @tparam Embedding The axis label for the embedding space.
+  * @tparam V The floating-point scalar type of the tensor elements.
+  * @param params The learnable parameters.
+  */
+
+class LearnedAbsolutePositionalInjector[Context: Λ, Embedding: Λ, V: IsFloating](params: LearnedAbsolutePositionalInjector.Params[Context, Embedding, V]) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
   override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     context + params.positionalEmbeddings

@@ -5,7 +5,7 @@ import dimwit.jax.Jax
 import dimwit.python.PyBridge.{liftPyTensor, toPyTensor}
 import dimwit.Label as Λ
 
-case class MaxPool2DLayer[S1: Λ, S2: Λ, V: IsFloating](
+class MaxPool2DLayer[S1: Λ, S2: Λ, V: IsFloating](
     window: Window2[S1, S2] | Int,
     stride: Stride2[S1, S2] | Int = 1,
     padding: Padding = Padding.SAME

@@ -1,23 +1,17 @@
 /** My attempt to add gradient accumulation => Leads to OOM... */
 
-package example.gpt
+package deepwit.examples.gpt
 import deepwit.checkpointing.TensorTreeCheckpointer
-import deepwit.transformer.MLPEmbeddingMixer
+import deepwit.transformer.EmbeddingMixed
 import deepwit.loss.CategoricalCrossEntropy
 
 object BACKUP:
 
   import dimwit.*
-  import dimwit.jax.Jax
   import dimwit.Conversions.given
   import deepwit.*
-  import deepwit.transformer.attention.{Head, HeadQuery, HeadKey, HeadValue}
   import deepwit.optimizer.schedule.*
-  import dimwit.nn.ActivationFunctions.gelu
   import dimwit.optimizer.{AdamW, Adam, AdamState}
-  import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
-  import dimwit.stats.Uniform
-  import dimwit.hardware.DeviceBackend.{CPU, GPU}
   import dimwit.TreeOf.ops.*
 
   import java.io.{FileWriter, PrintWriter, File}
@@ -26,7 +20,6 @@ object BACKUP:
   import FineWebDataset.{BatchSample, batchStream}
 
   import dimwit.TreeOf.map
-  import dimwit.TreeOf.mapLeaves
   import me.shadaj.scalapy.py
 
   import deepwit.optimizer.schedule.LearningRateSchedule
@@ -48,7 +41,7 @@ object BACKUP:
     val contextExtent = Axis[Context] -> 1024
     val numHeads = 12
     val embeddingExtent = Axis[Embedding] -> 64 * numHeads
-    val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 3072
+    val embeddingMixedExtent = Axis[EmbeddingMixed] -> 3072
 
     val valTokens = 10485760
     val valSamples = valTokens / contextExtent.size
@@ -67,7 +60,7 @@ object BACKUP:
     val contextExtent = Axis[Context] -> 32
     val numHeads = 4
     val embeddingExtent = Axis[Embedding] -> 32 * numHeads
-    val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 512
+    val embeddingMixedExtent = Axis[EmbeddingMixed] -> 512
 
   import Config.*
 

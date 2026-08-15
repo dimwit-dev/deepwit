@@ -43,7 +43,7 @@ Furthermore, having explicit gradients makes implementing custom training logic�
 
 In DeepWit, we embrace **explicitness as a feature**, not a burden. While defining concepts explicitly requires slightly more upfront code, the return on investment is massive: it demystifies complex architectures and tightly couples the implementation back to the theory.
 
-Breaking with the tradition of most existing deep learning frameworks, DeepWit requires the user to, among others, represent learnable parameters as explicit data objects, pass hyperparameters in a separate parameter group, and handle random effects manually throughout the architecture (see Core Concepts in DeepWit).
+Breaking with the tradition of most existing deep learning frameworks, DeepWit requires the user to, among others, represent learnable parameters as explicit data objects, choose an initialization scheme explicitly, and handle random effects manually throughout the architecture (see Core Concepts in DeepWit).
 These design choices replace "framework magic" with a transparent implementation that remains highly aligned with the theory. In this directness, we find value and beauty.
 
 ## Core Concepts in DeepWit
@@ -54,50 +54,18 @@ This section describes some core concepts in DeepWit that significantly differ f
 
 DeepWit requires parameters to be defined as dedicated **data objects**. While this adds a small amount of boilerplate, it brings the code into closer alignment with theory. It makes the implementation entirely transparent for critical tasks like weight initialization, updating parameters, augmentating parameters (e.g., dropout), and storing model weights (e.g., checkpointing).
 
-For example, `AffineLayer.Params[In, Out]` represents the parameters for an affine layer. Because these are decoupled from the layer's logic, an explicit initialization method must be chosen (or implemented) _by the user_ at the time of creation.
+For example, `AffineLayer.Params[In, Out, V]` represents the parameters for an affine layer. Because these are decoupled from the layer's logic, an explicit initialization scheme must be chosen (or implemented) _by the user_ at the time of creation.
+
+### Modules Are Functions
+
+A DeepWit module is nothing more than a function from parameters to a mathematical function. There is no `Module` base class, no registration mechanism, and no hidden parameter store: a module is a plain Scala class extending `Function1` (or `Function2`), constructed from its parameters.
 
 ```scala
-
-object AffineLayer:
-
-  case class Params[In, Out](
-      weight: Tensor2[In, Out, Float],
-      bias: Tensor1[Out, Float]
-  )
-
-  object Params:
-
-    // Provide default, transparent strategies for initialization
-    
-    def xavierNormal[In: Label, Out: Label](
-      inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Random.Key
-    ): Params[In, Out] = Params(
-      weight = init.xavierNormal(inExtent, outExtent, key),
-      bias = Tensor(Shape(outExtent)).fill(0f)
-    )
-
-    def xavierUniform(...) = ...
-
-// Example of explicit parameters in user's code
-val params = AffineLayer.Params.xavierDefault(Axis[Feature] -> 100, Axis[Output] -> 1)
-val model = AffineLayer(params)
-
+class Model(params: Model.Params, /* architectural configuration with defaults */) extends (In => Out):
+  override def apply(in: In): Out = ...
 ```
 
-### Explicit Hyperparameter Group and Function
-
-DeepWit modules follow a **curried constructor pattern** that requires hyperparameters first (if any), followed by parameters. This structural separation aligns the implementation with the theoretical transition from a model family to a mathematical function: Passing the hyperparameters fixes the "kind" of model, establishing its internal structure. Passing the parameters fixes the model's behavior to form a concrete mathematical function.
-
-```scala
-case class Model
-  // 1: Define "kind" of model 
-  (hyperParams: HyperParams)
-  // 2: Define behavior of model
-  (params: Params)
-  // 3: Results in a concrete function
-  extends (In => Out):
-    override apply(in: In): Out = ...
-```
+Everything beyond the parameters is architectural configuration — an attention mask, a convolution stride, an activation function, a normalization epsilon. These follow the parameters in the constructor and carry sensible defaults, so a module can always be built from its parameters alone while remaining open to variation. Note that this is deliberately *not* the place for hyperparameters in the statistical sense (regularization strength, learning rate, …): those belong to the outer optimization loop the user writes, not to the model.
 
 ### Explicit Randomness
 

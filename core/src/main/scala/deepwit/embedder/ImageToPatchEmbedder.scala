@@ -1,12 +1,23 @@
 package deepwit.embedder
 
 import dimwit.*
-import dimwit.Conversions.given
 import deepwit.cnn.AffineConv2DLayer
 import deepwit.embedder.PositionalEncoding.sinusoidal2D
 import dimwit.Label as Λ
 
-case class ImageToPatchEmbedder[
+/** Cuts an image into non-overlapping patches and embeds every patch into a sequence element.
+  *
+  * The patches are produced by a strided convolution whose stride equals the kernel size, and are
+  * enriched with a 2D sinusoidal positional encoding before being flattened into a sequence.
+  *
+  * @tparam Width The axis label for the image width.
+  * @tparam Height The axis label for the image height.
+  * @tparam Channel The axis label for the image channels.
+  * @tparam PatchEmbedding The axis label for the patch embedding space.
+  * @tparam V The floating-point scalar type of the tensor elements.
+  * @param params The learnable parameters.
+  */
+class ImageToPatchEmbedder[
     Width: Λ,
     Height: Λ,
     Channel: Λ,
@@ -25,35 +36,6 @@ case class ImageToPatchEmbedder[
     val patches = convLayer(img)
     val patchesPos = patches + sinusoidal2D(patches.shape)
     patchesPos.flatten((Axis[Width], Axis[Height]))
-
-  protected def positionalEncoding2D(shape: Shape3[Width, Height, PatchEmbedding]): Tensor3[Width, Height, PatchEmbedding, V] =
-    // 1. Prepare things we need for positional encoding
-    val widthExtent = shape.extent(Axis[Width]).size
-    val heightExtent = shape.extent(Axis[Height]).size
-    val embedDim = shape.extent(Axis[PatchEmbedding]).size
-
-    // Each spatial dimension (Width, Height) gets exactly half the embedding capacity (embedDim / 2).
-    // Since we generate both sine and cosine pairs for each scale, we divide by 2 again.
-    // Therefore, the number of unique frequency scales needed is (embedDim / 2) / 2 = embedDim / 4.
-    require(embedDim % 4 == 0, s"PatchEmbedding dimension ($embedDim) must be cleanly divisible by 4 to generate symmetrical 2D sinusoidal positional encodings.")
-    val scaleCount = embedDim / 4 //
-    val posScales = (Tensor1(Axis[PatchEmbedding]).fromArray(Array.range(0, scaleCount)).asFloat(VType[V]) *! -(Tensor0(VType[V])(10000.0f).log / scaleCount)).exp
-
-    // 2. Prepare Width (X-axis)
-    val widthPosRaw = Tensor1(Axis[Width]).fromArray(Array.range(0, widthExtent))
-    val widthPosScaled = widthPosRaw.asFloat(VType[V]).vmap(Axis[Width])(_ *! posScales)
-    val widthPosEncoded = concatenate(widthPosScaled.sin, widthPosScaled.cos, concatAxis = Axis[PatchEmbedding])
-
-    // 3. Prepare Height (Y-axis)
-    val heightPosRaw = Tensor1(Axis[Height]).fromArray(Array.range(0, heightExtent))
-    val heightPosScaled = heightPosRaw.asFloat(VType[V]).vmap(Axis[Height])(_ *! posScales)
-    val heightPosEncoded = concatenate(heightPosScaled.sin, heightPosScaled.cos, concatAxis = Axis[PatchEmbedding])
-
-    // 4. Expansion into 2D Grids and Concatenation
-    val widthPosGrid = stack(List.fill(heightExtent)(widthPosEncoded), newAxis = Axis[Height]).transpose(Axis[Width], Axis[Height], Axis[PatchEmbedding])
-    val heightPosGrid = stack(List.fill(widthExtent)(heightPosEncoded), newAxis = Axis[Width])
-
-    concatenate(widthPosGrid, heightPosGrid, concatAxis = Axis[PatchEmbedding])
 
 object ImageToPatchEmbedder:
 

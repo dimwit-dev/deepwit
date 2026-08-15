@@ -1,7 +1,7 @@
 import dimwit.*
 import dimwit.Conversions.given
 import deepwit.logging.TensorTreeLogger
-import deepwit.example.mnist_classification.*
+import deepwit.examples.mnistClassification.*
 
 import plotwit.plotting.Plotting
 import plotwit.plotting.Plotting.grid

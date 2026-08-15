@@ -3,22 +3,15 @@
   * - Increase batch size (gradient accumulation)
   */
 
-package example.gpt
+package deepwit.examples.gpt
 
 import dimwit.*
-import dimwit.jax.Jax
 import dimwit.Conversions.given
 import deepwit.*
-import deepwit.transformer.attention.{Head, HeadQuery, HeadKey, HeadValue}
-import nn.ActivationFunctions.gelu
 import dimwit.optimizer.{Adam, AdamState, AdamW}
-import dimwit.python.PyBridge.{toPyTensor, liftPyTensor, liftPyTensor1}
-import dimwit.stats.Uniform
-import dimwit.hardware.DeviceBackend.{CPU, GPU}
 import dimwit.TreeOf.ops.asFloats
-import me.shadaj.scalapy.py
 import FineWebDataset.{BatchSample, batchStream}
-import deepwit.transformer.MLPEmbeddingMixer
+import deepwit.transformer.EmbeddingMixed
 import deepwit.loss.CategoricalCrossEntropy
 
 object Config:
@@ -33,7 +26,7 @@ object Config:
   val contextExtent = Axis[Context] -> 1024
   val numHeads = 12
   val embeddingExtent = Axis[Embedding] -> 64 * numHeads
-  val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 3072
+  val embeddingMixedExtent = Axis[EmbeddingMixed] -> 3072
 
 object DebugConfig:
   val batchSize = 1
@@ -47,7 +40,7 @@ object DebugConfig:
   val contextExtent = Axis[Context] -> 32
   val numHeads = 4
   val embeddingExtent = Axis[Embedding] -> 32 * numHeads
-  val embeddingMixedExtent = Axis[MLPEmbeddingMixer.EmbeddingMixed] -> 512
+  val embeddingMixedExtent = Axis[EmbeddingMixed] -> 512
 
 import Config.*
 

@@ -1,4 +1,4 @@
-package deepwit.example.mnist_classification
+package deepwit.examples.mnistClassification
 
 import dimwit.*
 import dimwit.Conversions.given

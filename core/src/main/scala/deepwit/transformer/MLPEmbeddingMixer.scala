@@ -5,20 +5,39 @@ import deepwit.base.gelu
 import deepwit.base.AffineLayer
 import dimwit.Label as Λ
 
-case class MLPEmbeddingMixer[Embedding: Λ, V: IsFloating](
-    params: MLPEmbeddingMixer.Params[Embedding, V]
+/** Mixes the components of a single embedding through a two-layer MLP.
+  *
+  * The embedding is expanded into the wider [[EmbeddingMixed]] space, passed through the
+  * activation function, and projected back into the embedding space.
+  *
+  * @tparam Embedding The axis label for the embedding space.
+  * @tparam V The floating-point scalar type of the tensor elements.
+  * @param params The learnable parameters.
+  * @param activation The activation function applied to the expanded embedding.
+  */
+class MLPEmbeddingMixer[Embedding: Λ, V: IsFloating](
+    params: MLPEmbeddingMixer.Params[Embedding, V],
+    activation: Tensor1[EmbeddingMixed, V] => Tensor1[EmbeddingMixed, V]
 ) extends (Tensor1[Embedding, V] => Tensor1[Embedding, V]):
 
-  private val hiddenLayer = AffineLayer(params.expand)
-  private val outputLayer = AffineLayer(params.project)
+  private val expandLayer = AffineLayer(params.expand)
+  private val projectLayer = AffineLayer(params.project)
 
-  override def apply(in: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
-    val hidden = gelu(hiddenLayer(in))
-    outputLayer(hidden)
+  override def apply(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
+    val mixed = activation(expandLayer(embedding))
+    projectLayer(mixed)
 
 object MLPEmbeddingMixer:
 
-  trait EmbeddingMixed derives Label
+  /** Defaults the activation to [[deepwit.base.gelu]]. */
+  def apply[Embedding: Λ, V: IsFloating](params: Params[Embedding, V]): MLPEmbeddingMixer[Embedding, V] =
+    new MLPEmbeddingMixer(params, gelu)
+
+  def apply[Embedding: Λ, V: IsFloating](
+      params: Params[Embedding, V],
+      activation: Tensor1[EmbeddingMixed, V] => Tensor1[EmbeddingMixed, V]
+  ): MLPEmbeddingMixer[Embedding, V] =
+    new MLPEmbeddingMixer(params, activation)
 
   case class Params[Embedding, V](
       expand: AffineLayer.Params[Embedding, EmbeddingMixed, V],
@@ -28,15 +47,15 @@ object MLPEmbeddingMixer:
   object Params:
 
     def xavierNormal[Embedding: Λ, V: IsFloating](embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
-      val (fcKey, projKey) = key.splitToTuple(2)
+      val (expandKey, projectKey) = key.splitToTuple(2)
       Params(
-        expand = AffineLayer.Params.xavierNormal(embeddingExtent, embeddingMixedExtent, vtype, fcKey),
-        project = AffineLayer.Params.xavierNormal(embeddingMixedExtent, embeddingExtent, vtype, projKey)
+        expand = AffineLayer.Params.xavierNormal(embeddingExtent, embeddingMixedExtent, vtype, expandKey),
+        project = AffineLayer.Params.xavierNormal(embeddingMixedExtent, embeddingExtent, vtype, projectKey)
       )
 
     def xavierUniform[Embedding: Λ, V: IsFloating](embeddingExtent: AxisExtent[Embedding], embeddingMixedExtent: AxisExtent[EmbeddingMixed], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
-      val (fcKey, projKey) = key.splitToTuple(2)
+      val (expandKey, projectKey) = key.splitToTuple(2)
       Params(
-        expand = AffineLayer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, vtype, fcKey),
-        project = AffineLayer.Params.xavierUniform(embeddingMixedExtent, embeddingExtent, vtype, projKey)
+        expand = AffineLayer.Params.xavierUniform(embeddingExtent, embeddingMixedExtent, vtype, expandKey),
+        project = AffineLayer.Params.xavierUniform(embeddingMixedExtent, embeddingExtent, vtype, projectKey)
       )

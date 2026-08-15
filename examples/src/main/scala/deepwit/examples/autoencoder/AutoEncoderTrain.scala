@@ -1,21 +1,17 @@
-package deepwit.example.autoencoder
+package deepwit.examples.autoencoder
 
-import examples.timed
 import dimwit.*
 import dimwit.Conversions.given
 
-import dimwit.stats.Normal
 import dimwit.optimizer.GradientDescent
 import dimwit.optimizer.GradientDescentState
-import dimwit.jax.Jax
 
 import deepwit.examples.dataset.MNISTLoader
-import MNISTLoader.{Sample, TrainSample, TestSample}
+import MNISTLoader.TestSample
 
 import deepwit.{Monitor, tapEvery}
 import deepwit.checkpointing.TensorTreeCheckpointer
 import deepwit.loss.BinaryCrossEntropy
-import deepwit.base.{relu, sigmoid}
 
 trait Batch derives Label
 
@@ -55,8 +51,7 @@ def autoEncoderTraining(): Unit =
   val optimizer = GradientDescent(learningRate = learningRate)
 
   def gradientStep(batch: Tensor3[Batch, Height, Width, Float32], state: TrainState): TrainState =
-    val grads = Autodiff.grad(costFnFor(batch))(state.params)
-    val cost = costFnFor(batch)(state.params)
+    val (cost, grads) = Autodiff.valueAndGrad(costFnFor(batch))(state.params)
     val (newParams, newOptimizerState) = optimizer.update(grads, state.params, state.optimizerState)
     TrainState(newParams, newOptimizerState, cost)
   val jitGradientStep = jitDonatingUnsafe(gradientStep)

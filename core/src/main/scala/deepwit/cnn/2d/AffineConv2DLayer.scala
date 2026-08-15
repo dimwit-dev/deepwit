@@ -3,7 +3,7 @@ package deepwit.cnn.`2d`
 import dimwit.*
 import dimwit.Label as Λ
 
-case class AffineConv2DLayer[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](
+class AffineConv2DLayer[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](
     params: AffineConv2DLayer.Params[S1, S2, InChannel, OutChannel, V],
     stride: Stride2[S1, S2] | Int = 1,
     padding: Padding = Padding.SAME

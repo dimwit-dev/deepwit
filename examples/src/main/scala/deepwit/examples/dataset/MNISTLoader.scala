@@ -4,7 +4,6 @@ import dimwit.*
 import dimwit.Conversions.given
 
 import me.shadaj.scalapy.py
-import me.shadaj.scalapy.py.SeqConverters
 import java.io.RandomAccessFile
 import scala.util.Try
 
