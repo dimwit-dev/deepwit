@@ -7,7 +7,7 @@ import MNISTLoader.{TestSample, Height, Width}
 import dimwit.*
 import dimwit.python.PyBridge.toPyTensor
 import deepwit.loss.CategoricalCrossEntropy
-import deepwit.base.softmax
+import deepwit.activation.softmax
 
 import me.shadaj.scalapy.py
 import me.shadaj.scalapy.py.SeqConverters

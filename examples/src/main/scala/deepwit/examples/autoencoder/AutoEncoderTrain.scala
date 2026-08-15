@@ -9,7 +9,7 @@ import dimwit.optimizer.GradientDescentState
 import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.TestSample
 
-import deepwit.{Monitor, tapEvery}
+import deepwit.training.{Monitor, tapEvery}
 import deepwit.checkpointing.TensorTreeCheckpointer
 import deepwit.loss.BinaryCrossEntropy
 

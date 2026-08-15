@@ -9,8 +9,8 @@ object BACKUP:
 
   import dimwit.*
   import dimwit.Conversions.given
-  import deepwit.*
-  import deepwit.optimizer.schedule.*
+  import deepwit.training.tapEvery
+  import deepwit.optimizer.*
   import dimwit.optimizer.{AdamW, Adam, AdamState}
   import dimwit.TreeOf.ops.*
 
@@ -22,8 +22,8 @@ object BACKUP:
   import dimwit.TreeOf.map
   import me.shadaj.scalapy.py
 
-  import deepwit.optimizer.schedule.LearningRateSchedule
-  import deepwit.optimizer.schedule.LearningRateSchedules.LinearWarmup
+  import deepwit.optimizer.LearningRateSchedule
+  import deepwit.optimizer.LearningRateSchedules.LinearWarmup
 
   object Config:
     val runningBatchSize = 64 // 12

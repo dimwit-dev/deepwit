@@ -3,7 +3,6 @@ package deepwit.examples.gpt
 import dimwit.*
 import dimwit.Conversions.given
 import nn.ActivationFunctions.softmax
-import deepwit.*
 import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue}
 import dimwit.stats.Categorical
 import deepwit.embedder.VocabularyEmbedder

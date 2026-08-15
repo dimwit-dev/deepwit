@@ -1,4 +1,4 @@
-package deepwit.base
+package deepwit.optimizer
 
 import dimwit.*
 import dimwit.Conversions.given
@@ -9,7 +9,6 @@ import scala.compiletime.testing.typeCheckErrors
 import org.scalatest.Inspectors.forAll
 
 import deepwit.*
-import deepwit.optimizer.schedule.*
 import dimwit.optimizer.GradientDescent
 
 class LearningRateScheduleSuite extends AnyFunSpec with Matchers:

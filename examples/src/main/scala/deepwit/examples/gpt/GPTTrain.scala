@@ -7,7 +7,7 @@ package deepwit.examples.gpt
 
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.*
+import deepwit.training.tapEvery
 import dimwit.optimizer.{Adam, AdamState, AdamW}
 import dimwit.TreeOf.ops.asFloats
 import FineWebDataset.{BatchSample, batchStream}

@@ -1,4 +1,4 @@
-package deepwit.cnn.`2d`
+package deepwit.cnn
 
 import dimwit.*
 import dimwit.Label as Λ

@@ -2,7 +2,8 @@ package deepwit.examples.mnistClassification
 
 import dimwit.*
 
-import deepwit.base.{AffineLayer, relu}
+import deepwit.base.AffineLayer
+import deepwit.activation.relu
 import deepwit.cnn.AffineConv2DLayer
 
 object MNistCNN:

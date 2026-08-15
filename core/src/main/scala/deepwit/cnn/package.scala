@@ -1,6 +1,20 @@
-package deepwit
+package deepwit.cnn
 
+import dimwit.*
 
-package object cnn:
-  // 2D Convolutions
-  export deepwit.cnn.`2d`.{AffineConv2DLayer, LinearConv2DLayer, TransposeAffineConv2DLayer, TransposeLinearConv2DLayer}
+/** The extent of a 2D pooling window, one extent per spatial axis. */
+type Window2[S1, S2] = (AxisExtent[S1], AxisExtent[S2])
+
+/** Samples a 2D convolution kernel from the Xavier/Glorot uniform distribution.
+  *
+  * The kernel is initialized as a flat matrix whose fan-in spans the spatial axes and the input
+  * channels, and is then unflattened back into kernel shape.
+  */
+private[cnn] def xavierUniformKernel[S1: Label, S2: Label, InChannel: Label, OutChannel: Label, V: IsFloating](s1Extent: AxisExtent[S1], s2Extent: AxisExtent[S2], channelExtent: AxisExtent[InChannel], outChannelExtent: AxisExtent[OutChannel], vtype: VType[V], key: Random.Key): Tensor[(S1, S2, InChannel, OutChannel), V] =
+  val fanIn = s1Extent * s2Extent * channelExtent
+  val fanOut = outChannelExtent
+  val flatKernel = deepwit.init.xavierUniform(fanIn, fanOut, vtype, key)
+  flatKernel.unflatten(
+    Axis[S1 |*| S2 |*| InChannel],
+    Shape(s1Extent, s2Extent, channelExtent)
+  )

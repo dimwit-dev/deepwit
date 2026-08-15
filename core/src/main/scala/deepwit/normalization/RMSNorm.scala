@@ -6,6 +6,7 @@ import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
+
 class RMSNorm[L: Λ, V: IsFloating](
     params: RMSNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon

@@ -19,7 +19,7 @@ case class Timer private (
     val elapsed = now - lastTime
     internalRunningAverage =
       if internalRunningAverage == -1f
-      then elapsed
+      then elapsed.toFloat
       else internalRunningAverage * decay + elapsed * (1f - decay)
     lastTime = now
 

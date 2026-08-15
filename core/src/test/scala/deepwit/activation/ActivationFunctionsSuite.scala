@@ -1,13 +1,13 @@
-package deepwit.base
+package deepwit.activation
 
 import deepwit.*
 import dimwit.*
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec
 
-class ActivationFunctionSuite extends AnyFunSpec with Matchers:
+class ActivationFunctionsSuite extends AnyFunSpec with Matchers:
 
-  describe("ActivationFunction"):
+  describe("ActivationFunctions"):
 
     it("sigmoid"):
       val t = Tensor(Shape1(Axis[A] -> 3)).fromArray(Array(0f, 20f, -20f))

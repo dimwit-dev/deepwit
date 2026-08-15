@@ -8,7 +8,7 @@ import deepwit.loss.CategoricalCrossEntropy
 
 import deepwit.examples.dataset.{MNISTLoader, MNISTBatchSample}
 import dimwit.optimizer.GradientDescentState
-import deepwit.{Monitor, tapEvery}
+import deepwit.training.{Monitor, tapEvery}
 import deepwit.checkpointing.TensorTreeCheckpointer
 
 private trait Batch derives Label

@@ -1,4 +1,4 @@
-package deepwit.optimizer.schedule
+package deepwit.optimizer
 
 import dimwit.*
 import dimwit.Conversions.given

@@ -3,7 +3,7 @@ package deepwit.examples.autoencoder
 import dimwit.*
 
 import deepwit.base.AffineLayer
-import deepwit.base.{relu, sigmoid}
+import deepwit.activation.{relu, sigmoid}
 
 class Autoencoder(params: Autoencoder.Params):
 

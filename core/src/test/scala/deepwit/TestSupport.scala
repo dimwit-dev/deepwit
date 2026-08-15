@@ -3,18 +3,9 @@ package deepwit
 /** Global test utility definitions */
 
 import dimwit.*
-import dimwit.Conversions.given
-import org.scalacheck.Prop.*
-import org.scalacheck.{Arbitrary, Gen}
-import me.shadaj.scalapy.py
-import me.shadaj.scalapy.py.SeqConverters
-import org.scalacheck.Prop.forAll
 
-import org.scalatest.propspec.AnyPropSpec
-import org.scalatest.matchers.should.Matchers
 
 import org.scalatest.matchers.{Matcher, MatchResult}
-import scala.compiletime.error
 
 trait A derives Label
 trait B derives Label

@@ -40,6 +40,7 @@ class TensorTreeCheckpointer(
         .map: name =>
           name.stripSuffix(".pkl").toInt
         .sorted
+        .toIndexedSeq
 
   private def createFolder(path: Path): Unit =
     assert(!path.toFile.exists() || overwrite, s"Directory $rootPath already exists. Set overwrite = true to overwrite.")

@@ -6,6 +6,7 @@ import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
+
 class LayerNorm[L: Λ, V: IsFloating](
     params: LayerNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon

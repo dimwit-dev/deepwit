@@ -1,7 +1,7 @@
 package deepwit.transformer
 
 import dimwit.*
-import deepwit.base.gelu
+import deepwit.activation.gelu
 import deepwit.base.AffineLayer
 import dimwit.Label as Λ
 
@@ -29,7 +29,7 @@ class MLPEmbeddingMixer[Embedding: Λ, V: IsFloating](
 
 object MLPEmbeddingMixer:
 
-  /** Defaults the activation to [[deepwit.base.gelu]]. */
+  /** Defaults the activation to [[deepwit.activation.gelu]]. */
   def apply[Embedding: Λ, V: IsFloating](params: Params[Embedding, V]): MLPEmbeddingMixer[Embedding, V] =
     new MLPEmbeddingMixer(params, gelu)
 
