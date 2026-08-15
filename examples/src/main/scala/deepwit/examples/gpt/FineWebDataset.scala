@@ -25,7 +25,7 @@ object FineWebDataset:
       np.memmap(binaryPath, dtype = np.uint16, mode = "r", offset = 1024)
     )
 
-  def loadBatch(data: LazyTensor1[Sample, UInt16], batchSize: Int, contextLength: Int, key: Random.Key): BatchSample =
+  def loadBatch(data: LazyTensor1[Sample, UInt16], batchSize: Int, contextLength: Int, key: Key): BatchSample =
     val maxIdx = data.shape(Axis[Sample]) - batchSize - 1
     val randomIndices = IndependentDistribution.fromUnivariate(
       Shape1(Axis[Sample] -> batchSize),
@@ -41,7 +41,7 @@ object FineWebDataset:
     val gpu = GPU.devices.head
     BatchSample(targets.asInt32.toDevice(gpu), inputs.asInt32.toDevice(gpu))
 
-  def batchStream(dataDir: String, filePrefix: String, batchSize: Int, contextLength: Int, initialKey: Random.Key): Iterator[BatchSample] =
+  def batchStream(dataDir: String, filePrefix: String, batchSize: Int, contextLength: Int, initialKey: Key): Iterator[BatchSample] =
     val files = new File(dataDir)
       .listFiles()
       .filter(_.getName.startsWith(filePrefix))

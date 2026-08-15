@@ -18,7 +18,7 @@ object BPETokenizer:
 @main def generateText(): Unit =
 
   val promptText = "Here is my grandmother's secret recipe for the best chocolate chip cookies. Ingredients:"
-  given key: Random.Key = Random.Key.fromTime()
+  given key: Key = Random.Key.fromTime()
 
   println("Loading model checkpoint...")
   val params: GPT.Params[Float32] = ???

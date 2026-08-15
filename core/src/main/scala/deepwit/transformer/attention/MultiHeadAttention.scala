@@ -46,14 +46,14 @@ object MultiHeadAttention:
 
   object Params:
 
-    def xavierUniformHeads[Embedding: Λ, HeadOut: Λ, V: IsFloating](numHeads: Int, embeddingExtent: AxisExtent[Embedding], headExtent: AxisExtent[HeadOut], vtype: VType[V], key: Random.Key): Tensor3[Head, Embedding, HeadOut, V] =
+    def xavierUniformHeads[Embedding: Λ, HeadOut: Λ, V: IsFloating](numHeads: Int, embeddingExtent: AxisExtent[Embedding], headExtent: AxisExtent[HeadOut], vtype: VType[V], key: Key): Tensor3[Head, Embedding, HeadOut, V] =
       stack(key.split(numHeads).map(key => init.xavierUniform(embeddingExtent, headExtent, vtype, key)), Axis[Head])
 
-    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key): AffineLayer.Params[In, Out, V] =
+    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], vtype: VType[V], key: Key): AffineLayer.Params[In, Out, V] =
       val gain = Math.sqrt(1.0 / (2 * numLayers)).toFloat
       AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, vtype, key, gain = gain)
 
-    def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], vtype: VType[V], key: Random.Key): Params[SourceEmbedding, TargetEmbedding, V] =
+    def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], vtype: VType[V], key: Key): Params[SourceEmbedding, TargetEmbedding, V] =
       require(targetEmbeddingExtent.size % numHeads == 0)
       require(sourceEmbeddingExtent.size % numHeads == 0)
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)

@@ -28,7 +28,7 @@ object Autoencoder:
         latentExtent: AxisExtent[Latent],
         dHidden1Extent: AxisExtent[DHidden1],
         dHidden2Extent: AxisExtent[DHidden2],
-        key: Random.Key
+        key: Key
     ): Params =
       val inputSize = 28 * 28
       val vtype = VType[Float32]

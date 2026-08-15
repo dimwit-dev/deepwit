@@ -33,13 +33,13 @@ object AffineFormLayer:
 
   object Params:
 
-    def xavierNormal[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
+    def xavierNormal[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, V] =
       Params(
         weight = init.xavierNormalVector(inExtent, vtype, key, gain = gain),
         bias = Tensor0(vtype)(0f)
       )
 
-    def xavierUniform[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, V] =
+    def xavierUniform[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, V] =
       Params(
         weight = init.xavierUniformVector(inExtent, vtype, key, gain = gain),
         bias = Tensor0(vtype)(0f)

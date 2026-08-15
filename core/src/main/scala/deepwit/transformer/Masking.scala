@@ -1,13 +1,14 @@
 package deepwit.transformer
 
 import dimwit.*
+import dimwit.Label as Λ
 
-def causalMask[Context: Label, CrossContext: Label](
+def causalMask[Context: Λ, CrossContext: Λ](
     scoreShape: Shape2[Context, CrossContext]
 ): Tensor[(Context, CrossContext), Bool] =
   tril(fullMask(scoreShape))
 
-def fullMask[Context: Label, CrossContext: Label](
+def fullMask[Context: Λ, CrossContext: Λ](
     scoreShape: Shape2[Context, CrossContext]
 ): Tensor[(Context, CrossContext), Bool] =
   Tensor(scoreShape).fill(true)

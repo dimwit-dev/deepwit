@@ -15,7 +15,7 @@ object MNistCNN:
   )
 
   object Params:
-    def apply(paramKey: Random.Key)(
+    def apply(paramKey: Key)(
         numHidden1: Int,
         numHidden2: Int
     ): Params =

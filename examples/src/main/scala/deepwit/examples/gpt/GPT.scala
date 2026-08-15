@@ -37,7 +37,7 @@ class GPT[V: IsFloating](params: GPT.Params[V]):
       prompt: Seq[Int],
       contextSize: Int = 1024,
       temperature: Float = 1.0f
-  )(using key: Random.Key): LazyList[Int] =
+  )(using key: Key): LazyList[Int] =
     val initialContext = if prompt.size > contextSize then prompt.takeRight(contextSize) else prompt
     val fastLogits = jit(logits)
 
@@ -86,7 +86,7 @@ object GPT:
         embeddingExtent: AxisExtent[Embedding],
         embeddingMixedExtent: AxisExtent[EmbeddingMixed],
         vtype: VType[V],
-        key: Random.Key
+        key: Key
     ): Params[V] =
       val (vocabEmbeddingKey, positionalEmbeddingKey, transformerKey, outputProjectionKey) = key.splitToTuple(4)
 

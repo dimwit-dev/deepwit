@@ -40,13 +40,13 @@ object AffineLayer:
         bias = Tensor(Shape(Axis[Prime[In]] -> extent.size), vtype).fill(0f)
       )
 
-    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
       Params(
         weight = deepwit.init.xavierNormal(inExtent, outExtent, vtype, key, gain = gain),
         bias = Tensor(Shape(outExtent), vtype).fill(0f)
       )
 
-    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
       Params(
         weight = deepwit.init.xavierUniform(inExtent, outExtent, vtype, key, gain = gain),
         bias = Tensor(Shape(outExtent), vtype).fill(0f)

@@ -67,7 +67,7 @@ object MultiHeadSelfAttention:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Random.Key): Params[Embedding, V] =
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Key): Params[Embedding, V] =
       require(embeddingExtent.size % numHeads == 0)
       import MultiHeadAttention.Params.{xavierUniformHeads, xavierUniformOutputProjection}
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)

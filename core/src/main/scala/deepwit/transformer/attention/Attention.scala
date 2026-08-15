@@ -79,6 +79,7 @@ object Attention:
     def apply[SourceEmbedding, TargetEmbedding, Query, Key, Value, V: IsFloating](wq: Tensor2[TargetEmbedding, Query, V], wk: Tensor2[SourceEmbedding, Key, V], wv: Tensor2[SourceEmbedding, Value, V]): Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V] =
       new Params(LinearLayer.Params(wq), LinearLayer.Params(wk), LinearLayer.Params(wv))
 
+    // `Key` names the attention key space here, so the random key needs its qualified type.
     def init[SourceEmbedding: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](queryExtent: AxisExtent[Query], keyExtent: AxisExtent[Key], valueExtent: AxisExtent[Value], sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], vtype: VType[V], key: Random.Key): Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V] =
       val (queryKey, keyKey, valueKey) = key.splitToTuple(3)
       Params(

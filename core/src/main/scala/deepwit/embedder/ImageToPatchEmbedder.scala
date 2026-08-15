@@ -45,5 +45,5 @@ object ImageToPatchEmbedder:
 
   object Params:
 
-    def xavierUniform[PatchWidth: Λ, PatchHeight: Λ, Channel: Λ, PatchEmbedding: Λ, V: IsFloating](patchWidthExtent: AxisExtent[PatchWidth], patchHeightExtent: AxisExtent[PatchHeight], channelExtent: AxisExtent[Channel], embeddingExtent: AxisExtent[PatchEmbedding], vtype: VType[V], key: Random.Key): Params[PatchWidth, PatchHeight, Channel, PatchEmbedding, V] =
+    def xavierUniform[PatchWidth: Λ, PatchHeight: Λ, Channel: Λ, PatchEmbedding: Λ, V: IsFloating](patchWidthExtent: AxisExtent[PatchWidth], patchHeightExtent: AxisExtent[PatchHeight], channelExtent: AxisExtent[Channel], embeddingExtent: AxisExtent[PatchEmbedding], vtype: VType[V], key: Key): Params[PatchWidth, PatchHeight, Channel, PatchEmbedding, V] =
       Params(conv = AffineConv2DLayer.Params.xavierUniform(patchWidthExtent, patchHeightExtent, channelExtent, embeddingExtent, vtype, key))

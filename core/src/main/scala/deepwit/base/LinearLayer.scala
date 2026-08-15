@@ -41,8 +41,8 @@ object LinearLayer:
 
     def identity[In: Λ, V: IsFloating](extent: AxisExtent[In], vtype: VType[V]): Params[In, Prime[In], V] = Params(weight = Tensor2.eye(extent, vtype))
 
-    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
       Params(weight = init.xavierNormal(inExtent, outExtent, vtype, key, gain = gain))
 
-    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Random.Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
       Params(weight = init.xavierUniform(inExtent, outExtent, vtype, key, gain = gain))

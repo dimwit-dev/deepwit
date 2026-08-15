@@ -2,6 +2,7 @@ package deepwit.loss
 
 import dimwit.*
 import dimwit.Conversions.given
+import dimwit.Label as Λ
 
 /** * Categorical (Multiclass) Cross Entropy Losses.
   * * Used for multi-class classification where the target is a discrete category
@@ -9,7 +10,7 @@ import dimwit.Conversions.given
   */
 object CategoricalCrossEntropy:
 
-  private def logsumexp[L: Label, V: IsFloating](logits: Tensor1[L, V]): Tensor0[V] =
+  private def logsumexp[L: Λ, V: IsFloating](logits: Tensor1[L, V]): Tensor0[V] =
     val maxLogit = logits.max(Axis[L])
     val logSumShifted = (logits -! maxLogit).exp.sum.log
     maxLogit + logSumShifted
@@ -19,7 +20,7 @@ object CategoricalCrossEntropy:
     * @param prediction A tensor of probabilities (e.g., from a Softmax).
     * @return Scalar loss value.
     */
-  def apply[L: Label, V: IsFloating](target: Tensor0[Int32], prediction: Tensor1[L, V]): Tensor0[V] =
+  def apply[L: Λ, V: IsFloating](target: Tensor0[Int32], prediction: Tensor1[L, V]): Tensor0[V] =
     stable(ε = Tensor0(VType[V])(1e-7f))(target, prediction)
 
   /** * Computes Categorical Cross Entropy from raw unnormalized scores (logits).
@@ -28,7 +29,7 @@ object CategoricalCrossEntropy:
     * * @param target The ground truth class index.
     * @param logits Raw model outputs in (-inf, +inf).
     */
-  def fromLogits[L: Label, V: IsFloating](target: Tensor0[Int32], logits: Tensor1[L, V]): Tensor0[V] =
+  def fromLogits[L: Λ, V: IsFloating](target: Tensor0[Int32], logits: Tensor1[L, V]): Tensor0[V] =
     val targetLogit = logits.slice(Axis[L].at(target))
     val logNormalizer = logsumexp(logits)
     logNormalizer - targetLogit
@@ -36,7 +37,7 @@ object CategoricalCrossEntropy:
   /** * Computes Categorical Cross Entropy with a custom stability epsilon.
     * * @param ε Small constant to prevent log(0).
     */
-  def stable[L: Label, V: IsFloating](ε: Tensor0[V])(target: Tensor0[Int32], prediction: Tensor1[L, V]): Tensor0[V] =
+  def stable[L: Λ, V: IsFloating](ε: Tensor0[V])(target: Tensor0[Int32], prediction: Tensor1[L, V]): Tensor0[V] =
     val p = prediction.clip(ε, 1f - ε)
     -p.slice(Axis[L].at(target)).log
 
