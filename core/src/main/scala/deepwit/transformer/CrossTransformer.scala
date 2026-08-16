@@ -49,6 +49,23 @@ object CrossTransformer:
     createSelfAttentionMask = causalMask[Context, Context]
   )
 
+  /** A cross transformer unrestricted in both directions: over its own context as well as onto
+    * the cross context.
+    *
+    * The counterpart of [[decoder]] for a context that is a set rather than a sequence, such as
+    * the object queries of a detection model, where every position has to see every other one to
+    * settle what it stands for.
+    */
+  def bidirectional[CrossContext: Λ, Context: Λ, CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](
+      crossAxis: Axis[CrossContext],
+      axis: Axis[Context],
+      params: CrossTransformer.Params[CrossEmbedding, Embedding, V]
+  ): CrossTransformer[CrossContext, CrossEmbedding, Context, Embedding, V] = CrossTransformer(
+    params,
+    createCrossAttentionMask = fullMask[Context, CrossContext],
+    createSelfAttentionMask = fullMask[Context, Context]
+  )
+
   case class Params[CrossEmbedding, Embedding, V](
       transformerLayers: List[CrossTransformerLayer.Params[CrossEmbedding, Embedding, V]],
       finalNorm: LayerNorm.Params[Embedding, V]
