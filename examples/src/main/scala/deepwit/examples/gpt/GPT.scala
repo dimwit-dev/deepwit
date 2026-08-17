@@ -8,14 +8,13 @@ import dimwit.stats.Categorical
 import deepwit.embedder.VocabularyEmbedder
 import deepwit.embedder.LearnedAbsolutePositionalInjector
 import deepwit.base.LinearLayer
-import deepwit.transformer.CausalTransformer
 import deepwit.transformer.EmbeddingMixed
 
 class GPT[V: IsFloating](params: GPT.Params[V]):
 
   private val embedder = VocabularyEmbedder(params.embedderParams)
   private val positionalInjector = LearnedAbsolutePositionalInjector(params.positionalInjectorParams)
-  private val causalTransformer = CausalTransformer(Axis[Context], params.transformer)
+  private val causalTransformer = GPT2Transformer(Axis[Context], params.transformer)
   private val outputProjection = LinearLayer(params.outputProjection)
 
   def logits(tokenContext: Tensor1[Context, Int32]): Tensor2[Context, Vocab, V] =
@@ -68,7 +67,7 @@ object GPT:
   case class Params[V](
       embedderParams: VocabularyEmbedder.Params[Vocab, Embedding, V],
       positionalInjectorParams: LearnedAbsolutePositionalInjector.Params[Context, Embedding, V],
-      transformer: CausalTransformer.Params[Embedding, V],
+      transformer: GPT2Transformer.Params[Embedding, V],
       outputProjection: LinearLayer.Params[Embedding, Vocab, V]
   )
 
@@ -93,7 +92,7 @@ object GPT:
       Params(
         embedderParams = VocabularyEmbedder.Params.lecunUniform(vocabExtent, embeddingExtent, vtype, vocabEmbeddingKey),
         positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, vtype, positionalEmbeddingKey),
-        transformer = CausalTransformer.Params.xavierUniformDepthScaled(
+        transformer = GPT2Transformer.Params.init(
           numTransformerLayers,
           numHeads,
           embeddingExtent = embeddingExtent,
