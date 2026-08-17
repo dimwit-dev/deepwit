@@ -1,6 +1,5 @@
 package deepwit.examples.gpt
 import deepwit.checkpointing.TensorTreeCheckpointer
-import deepwit.transformer.EmbeddingMixed
 import deepwit.loss.CategoricalCrossEntropy
 
 import dimwit.*

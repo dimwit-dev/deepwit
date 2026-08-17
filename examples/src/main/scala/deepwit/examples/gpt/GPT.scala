@@ -8,7 +8,6 @@ import dimwit.stats.Categorical
 import deepwit.embedder.VocabularyEmbedder
 import deepwit.embedder.LearnedAbsolutePositionalInjector
 import deepwit.base.LinearLayer
-import deepwit.transformer.EmbeddingMixed
 
 class GPT[V: IsFloating](params: GPT.Params[V]):
 

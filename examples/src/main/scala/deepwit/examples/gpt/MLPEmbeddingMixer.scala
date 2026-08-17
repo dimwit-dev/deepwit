@@ -1,4 +1,4 @@
-package deepwit.transformer
+package deepwit.examples.gpt
 
 import dimwit.*
 import deepwit.activation.gelu

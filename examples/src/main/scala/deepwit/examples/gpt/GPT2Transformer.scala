@@ -5,7 +5,7 @@ import dimwit.Label as Λ
 
 import deepwit.attention.{MultiHeadCausalSelfAttention, MultiHeadSelfAttention}
 import deepwit.normalization.LayerNorm
-import deepwit.transformer.{EmbeddingMixed, MLPEmbeddingMixer, TransformerBlock}
+import deepwit.transformer.TransformerBlock
 
 /** The transformer of GPT-2, as described in *Language Models are Unsupervised Multitask Learners*.
   *

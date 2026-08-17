@@ -7,6 +7,9 @@ trait Vocab derives Label
 trait Embedding derives Label
 trait Context derives Label
 
+/** The axis label for the widened space an embedding is mixed in by an [[MLPEmbeddingMixer]]. */
+trait EmbeddingMixed derives Label
+
 case class Timer private (
     private val decay: Float = 0.01f
 ):
