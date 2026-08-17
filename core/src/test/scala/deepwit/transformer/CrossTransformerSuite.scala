@@ -1,6 +1,7 @@
 package deepwit.transformer
 
 import deepwit.*
+import deepwit.attention.{causalMask, fullMask}
 import deepwit.normalization.LayerNorm
 import dimwit.*
 import dimwit.Conversions.given

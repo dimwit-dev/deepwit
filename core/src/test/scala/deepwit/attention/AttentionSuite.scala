@@ -1,7 +1,6 @@
-package deepwit.transformer.attention
+package deepwit.attention
 
 import deepwit.*
-import deepwit.transformer.{causalMask, fullMask}
 import dimwit.*
 import dimwit.Conversions.given
 import org.scalatest.matchers.should.Matchers
@@ -47,7 +46,7 @@ class AttentionSuite extends AnyFunSpec with Matchers:
       wv = identity2(Axis[SrcEmb], Axis[Vl])
     )
 
-  describe("Attention.scaledDotProductAttentionScores"):
+  describe("ScaledDotProduct"):
 
     it("scales the dot products by the square root of the key dimension"):
       // format: off
@@ -64,24 +63,24 @@ class AttentionSuite extends AnyFunSpec with Matchers:
         0f, 1f
       )) /! math.sqrt(2.0)
       // format: on
-      Attention.scaledDotProductAttentionScores(queries, keys) should approxEqual(expected, 1e-6f)
+      ScaledDotProduct[Tgt, Src, Qry, Ky, Float32]()(queries, keys) should approxEqual(expected, 1e-6f)
 
   describe("Attention"):
 
     it("returns one value vector per target position"):
-      val attention = Attention(paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), fullMask[Tgt, Src])
+      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])))
       val result = attention(source, target)
       result.shape(Axis[Tgt]) shouldBe 2
       result.shape(Axis[Vl]) shouldBe 2
 
     it("averages the values when every key is identical"):
       // Zero key weights make all scores equal, so softmax spreads the attention uniformly.
-      val attention = Attention(paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])), fullMask[Tgt, Src])
+      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])))
       val meanOfValues = Tensor(Shape(tgtExtent, Axis[Vl] -> 2)).fromArray(Array(2f, 3f, 2f, 3f))
       attention(source, target) should approxEqual(meanOfValues, 1e-5f)
 
     it("gives the first target position only the first source value under a causal mask"):
-      val attention = Attention(paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), causalMask[Tgt, Src])
+      val attention = CausalAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])))
       val firstRow = attention(source, target).slice(Axis[Tgt].at(0))
       firstRow should approxEqual(Tensor(Shape1(Axis[Vl] -> 2)).fromArray(Array(1f, 2f)), 1e-5f)
 
@@ -90,13 +89,13 @@ class AttentionSuite extends AnyFunSpec with Matchers:
       def constantScores(queries: Tensor2[Tgt, Qry, Float32], keys: Tensor2[Src, Ky, Float32]): Tensor2[Tgt, Src, Float32] =
         Tensor(Shape(queries.shape.extent(Axis[Tgt]), keys.shape.extent(Axis[Src])), VType[Float32]).fill(0f)
 
-      val attention = Attention(paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), fullMask[Tgt, Src], constantScores)
+      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), constantScores)
       val meanOfValues = Tensor(Shape(tgtExtent, Axis[Vl] -> 2)).fromArray(Array(2f, 3f, 2f, 3f))
       attention(source, target) should approxEqual(meanOfValues, 1e-5f)
 
     it("differs from the uniform result under the default scores"):
-      val default = Attention(paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), fullMask[Tgt, Src])
-      val uniform = Attention(paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])), fullMask[Tgt, Src])
+      val default = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])))
+      val uniform = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])))
       (default(source, target) - uniform(source, target)).abs.max.item should be > 1e-3f
 
   describe("Attention.Params.init"):

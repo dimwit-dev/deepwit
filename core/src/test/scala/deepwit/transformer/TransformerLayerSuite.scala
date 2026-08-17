@@ -46,23 +46,23 @@ class TransformerLayerSuite extends AnyFunSpec with Matchers:
   describe("TransformerLayer"):
 
     it("preserves the shape of the context"):
-      val layer = TransformerLayer(params, fullMask[Ctx, Ctx])
+      val layer = TransformerLayer(Axis[Ctx], params)
       val result = layer(context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
     it("is the identity when both residual branches are zeroed"):
-      val layer = TransformerLayer(zeroedBranches(params), fullMask[Ctx, Ctx])
+      val layer = TransformerLayer(Axis[Ctx], zeroedBranches(params))
       val x = context(13f)
       layer(x) should approxEqual(x, 1e-5f)
 
     it("changes the context when the branches are not zeroed"):
-      val layer = TransformerLayer(params, fullMask[Ctx, Ctx])
+      val layer = TransformerLayer(Axis[Ctx], params)
       val x = context(13f)
       (layer(x) - x).abs.max.item should be > 1e-3f
 
-    it("keeps earlier positions independent of later ones under a causal mask"):
-      val layer = TransformerLayer(params, causalMask[Ctx, Ctx])
+    it("keeps earlier positions independent of later ones, being causal"):
+      val layer = TransformerLayer(Axis[Ctx], params)
       val a = layer(context(13f))
       val b = layer(context(-99f))
       a.slice(Axis[Ctx].at(0 until 3)) should approxEqual(b.slice(Axis[Ctx].at(0 until 3)), 1e-4f)

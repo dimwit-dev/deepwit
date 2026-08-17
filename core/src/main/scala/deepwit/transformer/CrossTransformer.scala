@@ -3,6 +3,7 @@ package deepwit.transformer
 import dimwit.*
 import dimwit.Label as Λ
 import deepwit.normalization.LayerNorm
+import deepwit.attention.{causalMask, fullMask}
 
 /** A stack of [[CrossTransformerLayer]]s followed by a final normalization.
   *

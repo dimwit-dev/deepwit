@@ -35,38 +35,41 @@ class TransformerSuite extends AnyFunSpec with Matchers:
       )
     )
 
+  private def firstRowVaried(firstRow: Float) =
+    Tensor(Shape(ctxExtent, embExtent)).fromArray(
+      Array(
+        firstRow, 2f, 3f, 4f,
+        5f, 6f, 7f, 8f,
+        9f, 10f, 11f, 12f,
+        13f, 1f, 2f, 3f
+      )
+    )
+
   describe("Transformer"):
 
     it("preserves the shape of the context"):
-      val result = Transformer.causal(Axis[Ctx], params)(context(13f))
+      val result = Transformer(Axis[Ctx], params)(context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
     it("is just the final normalization when it has no layers"):
       val normParams = LayerNorm.Params.identity(embExtent, VType[Float32])
-      val transformer = Transformer.causal(Axis[Ctx], Transformer.Params(List.empty, normParams))
+      val transformer = Transformer(Axis[Ctx], Transformer.Params(List.empty, normParams))
       val x = context(13f)
       transformer(x) should approxEqual(x.vmap(Axis[Ctx])(LayerNorm(normParams)), 1e-5f)
 
-    it("keeps earlier positions independent of later ones when causal"):
-      val transformer = Transformer.causal(Axis[Ctx], params)
+    it("keeps earlier positions independent of later ones, being causal"):
+      val transformer = Transformer(Axis[Ctx], params)
       val a = transformer(context(13f))
       val b = transformer(context(-99f))
       a.slice(Axis[Ctx].at(0 until 3)) should approxEqual(b.slice(Axis[Ctx].at(0 until 3)), 1e-4f)
       (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
-    it("exposes later positions to earlier ones when bidirectional"):
-      val transformer = Transformer.bidirectional(Axis[Ctx], params)
-      val a = transformer(context(13f))
-      val b = transformer(context(-99f))
-      (a.slice(Axis[Ctx].at(0)) - b.slice(Axis[Ctx].at(0))).abs.max.item should be > 1e-3f
-
-    it("gives different results for causal and bidirectional masking"):
-      val p = params
-      val x = context(13f)
-      val causal = Transformer.causal(Axis[Ctx], p)(x)
-      val bidirectional = Transformer.bidirectional(Axis[Ctx], p)(x)
-      (causal - bidirectional).abs.max.item should be > 1e-3f
+    it("lets later positions see the earlier ones"):
+      val transformer = Transformer(Axis[Ctx], params)
+      val a = transformer(firstRowVaried(1f))
+      val b = transformer(firstRowVaried(-99f))
+      (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
   describe("Transformer.Params.xavierUniformDepthScaled"):
 

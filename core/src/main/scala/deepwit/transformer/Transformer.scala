@@ -4,17 +4,20 @@ import dimwit.*
 import deepwit.normalization.LayerNorm
 import dimwit.Label as Λ
 
-/** A stack of [[TransformerLayer]]s followed by a final normalization.
+/** The GPT-2 transformer: a stack of [[TransformerLayer]]s followed by a final normalization.
+  *
+  * Causal throughout, as GPT-2 is. This is a composed architecture rather than a building block,
+  * and is slated to move out of core.
   *
   * @tparam Context The axis label for the sequence.
   * @tparam Embedding The axis label for the embedding space.
   * @tparam V The floating-point scalar type of the tensor elements.
+  * @param contextAxis The axis of the sequence attending onto itself.
   * @param params The learnable parameters.
-  * @param createAttentionMask A function generating a boolean mask to prevent attention to certain positions.
   */
 class Transformer[Context: Λ, Embedding: Λ, V: IsFloating](
-    params: Transformer.Params[Embedding, V],
-    createAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
+    contextAxis: Axis[Context],
+    params: Transformer.Params[Embedding, V]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
   private val layers = params.transformerLayers.map(this.transformerLayer)
@@ -25,21 +28,9 @@ class Transformer[Context: Λ, Embedding: Λ, V: IsFloating](
       case (context_i, layer) => layer(context_i)
     res.vmap(Axis[Context])(finalNorm)
 
-  protected def transformerLayer(params: TransformerLayer.Params[Embedding, V]) = TransformerLayer(params, createAttentionMask)
+  protected def transformerLayer(params: TransformerLayer.Params[Embedding, V]) = TransformerLayer(contextAxis, params)
 
 object Transformer:
-
-  /** A transformer that may only attend to preceding positions. */
-  def causal[Context: Λ, Embedding: Λ, V: IsFloating](
-      axis: Axis[Context],
-      params: Params[Embedding, V]
-  ): Transformer[Context, Embedding, V] = Transformer(params, causalMask[Context, Context])
-
-  /** A transformer that may attend to all positions. */
-  def bidirectional[Context: Λ, Embedding: Λ, V: IsFloating](
-      axis: Axis[Context],
-      params: Params[Embedding, V]
-  ): Transformer[Context, Embedding, V] = Transformer(params, fullMask[Context, Context])
 
   case class Params[Embedding, V](
       transformerLayers: List[TransformerLayer.Params[Embedding, V]],

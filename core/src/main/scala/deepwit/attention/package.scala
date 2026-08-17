@@ -1,4 +1,4 @@
-package deepwit.transformer.attention
+package deepwit.attention
 
 import dimwit.Label
 

@@ -1,4 +1,4 @@
-package deepwit.transformer
+package deepwit.attention
 
 import deepwit.*
 import dimwit.*

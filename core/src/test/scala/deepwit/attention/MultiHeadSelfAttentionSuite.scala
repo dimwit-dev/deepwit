@@ -1,7 +1,6 @@
-package deepwit.transformer.attention
+package deepwit.attention
 
 import deepwit.*
-import deepwit.transformer.{causalMask, fullMask}
 import dimwit.*
 import dimwit.Conversions.given
 import org.scalatest.matchers.should.Matchers
@@ -37,23 +36,20 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
   describe("MultiHeadSelfAttention"):
 
     it("preserves the shape of the context"):
-      val attention = MultiHeadSelfAttention(params, fullMask[Ctx, Ctx])
+      val attention = MultiHeadFullSelfAttention(Axis[Ctx], params)
       val result = attention(context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
     it("is multi-head attention of the context onto itself"):
       val p = params
-      val selfAttention = MultiHeadSelfAttention(p, fullMask[Ctx, Ctx])
-      val crossAttention = MultiHeadAttention(
-        MultiHeadAttention.Params(p.queryWeights, p.keyWeights, p.valueWeights, p.outputProjection),
-        fullMask[Ctx, Ctx]
-      )
+      val selfAttention = MultiHeadFullSelfAttention(Axis[Ctx], p)
+      val crossAttention = MultiHeadFullAttention(Axis[Ctx], Axis[Ctx], p.asMultiHeadAttentionParams)
       val x = context(13f)
       selfAttention(x) should approxEqual(crossAttention(x, x), 1e-6f)
 
     it("lets a causal mask hide later positions from earlier ones"):
-      val attention = MultiHeadSelfAttention(params, causalMask[Ctx, Ctx])
+      val attention = MultiHeadCausalSelfAttention(Axis[Ctx], params)
       val a = attention(context(13f))
       val b = attention(context(-99f))
       // Positions 0 to 2 cannot attend to the perturbed final position.
@@ -62,7 +58,7 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
       (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
     it("lets a full mask expose later positions to earlier ones"):
-      val attention = MultiHeadSelfAttention(params, fullMask[Ctx, Ctx])
+      val attention = MultiHeadFullSelfAttention(Axis[Ctx], params)
       val a = attention(context(13f))
       val b = attention(context(-99f))
       (a.slice(Axis[Ctx].at(0)) - b.slice(Axis[Ctx].at(0))).abs.max.item should be > 1e-3f

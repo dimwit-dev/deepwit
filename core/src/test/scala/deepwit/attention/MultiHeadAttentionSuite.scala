@@ -1,8 +1,7 @@
-package deepwit.transformer.attention
+package deepwit.attention
 
 import deepwit.*
 import deepwit.base.AffineLayer
-import deepwit.transformer.{causalMask, fullMask}
 import dimwit.*
 import dimwit.Conversions.given
 import org.scalatest.matchers.should.Matchers
@@ -38,7 +37,7 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
   describe("MultiHeadAttention"):
 
     it("returns the target back in its own embedding space"):
-      val attention = MultiHeadAttention(params(), fullMask[Tgt, Src])
+      val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], params())
       val result = attention(source(), target)
       result.shape(Axis[Tgt]) shouldBe 3
       result.shape(Axis[TgtEmb]) shouldBe 4
@@ -51,7 +50,7 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
           bias = Tensor.like(base.outputProjection.bias).fromArray(Array(1f, 2f, 3f, 4f))
         )
       )
-      val attention = MultiHeadAttention(zeroed, fullMask[Tgt, Src])
+      val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], zeroed)
       val expectedRow = Tensor(Shape1(embExtent)).fromArray(Array(1f, 2f, 3f, 4f))
       val result = attention(source(), target)
       result.slice(Axis[Tgt].at(0)) should approxEqual(expectedRow, 1e-5f)
@@ -59,14 +58,14 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
 
     it("attends across a source whose embedding space differs from the target's"):
       // Head query and key extents both follow the target embedding, so the dot product lines up.
-      val attention = MultiHeadAttention(params(Axis[SrcEmb] -> 6), fullMask[Tgt, Src])
+      val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], params(Axis[SrcEmb] -> 6))
       val result = attention(source(embeddingSize = 6), target)
       result.shape(Axis[Tgt]) shouldBe 3
       result.shape(Axis[TgtEmb]) shouldBe 4
 
     it("restricts the first target position to the first source position under a causal mask"):
-      val full = MultiHeadAttention(params(), fullMask[Tgt, Src])
-      val causal = MultiHeadAttention(params(), causalMask[Tgt, Src])
+      val full = MultiHeadFullAttention(Axis[Src], Axis[Tgt], params())
+      val causal = MultiHeadCausalAttention(Axis[Src], Axis[Tgt], params())
       // Rows beyond the first see different amounts of the source, so the results diverge.
       val varyingSource = Tensor(Shape(srcExtent, Axis[SrcEmb] -> 4)).fromArray(
         Array(1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 10f, 11f, 12f)

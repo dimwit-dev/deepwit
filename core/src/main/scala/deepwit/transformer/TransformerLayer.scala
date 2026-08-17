@@ -2,23 +2,27 @@ package deepwit.transformer
 
 import dimwit.*
 import deepwit.normalization.LayerNorm
-import deepwit.transformer.attention.MultiHeadSelfAttention
+import deepwit.attention.{MultiHeadCausalSelfAttention, MultiHeadSelfAttention}
 import dimwit.Label as Λ
 
-/** A single pre-norm transformer layer, mixing along the context and then along the embedding.
+/** A single layer of the GPT-2 transformer, mixing along the context and then along the embedding.
+  *
+  * Every choice here is GPT-2's rather than a theorem: causal self-attention, LayerNorm ahead of
+  * both residual branches, and a GELU MLP as the embedding mixer. This is a composed architecture
+  * rather than a building block, and is slated to move out of core.
   *
   * @tparam Context The axis label for the sequence.
   * @tparam Embedding The axis label for the embedding space.
   * @tparam V The floating-point scalar type of the tensor elements.
+  * @param contextAxis The axis of the sequence attending onto itself.
   * @param params The learnable parameters.
-  * @param createAttentionMask A function generating a boolean mask to prevent attention to certain positions.
   */
 class TransformerLayer[Context: Λ, Embedding: Λ, V: IsFloating](
-    params: TransformerLayer.Params[Embedding, V],
-    createAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
+    contextAxis: Axis[Context],
+    params: TransformerLayer.Params[Embedding, V]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
-  private val selfAttention = MultiHeadSelfAttention(params.attentionParams, createAttentionMask)
+  private val selfAttention = MultiHeadCausalSelfAttention(contextAxis, params.attentionParams)
   private val selfAttentionPreNorm = LayerNorm(params.attentionNormParams)
 
   private val mlp = MLPEmbeddingMixer(params.mlpParams)

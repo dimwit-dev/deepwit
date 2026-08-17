@@ -3,7 +3,7 @@ package deepwit.examples.gpt
 import dimwit.*
 import dimwit.Conversions.given
 import nn.ActivationFunctions.softmax
-import deepwit.transformer.attention.{Head, HeadKey, HeadQuery, HeadValue}
+import deepwit.attention.{Head, HeadKey, HeadQuery, HeadValue}
 import dimwit.stats.Categorical
 import deepwit.embedder.VocabularyEmbedder
 import deepwit.embedder.LearnedAbsolutePositionalInjector
@@ -15,7 +15,7 @@ class GPT[V: IsFloating](params: GPT.Params[V]):
 
   private val embedder = VocabularyEmbedder(params.embedderParams)
   private val positionalInjector = LearnedAbsolutePositionalInjector(params.positionalInjectorParams)
-  private val causalTransformer = Transformer.causal(Axis[Context], params.transformer)
+  private val causalTransformer = Transformer(Axis[Context], params.transformer)
   private val outputProjection = LinearLayer(params.outputProjection)
 
   def logits(tokenContext: Tensor1[Context, Int32]): Tensor2[Context, Vocab, V] =

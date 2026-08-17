@@ -1,4 +1,4 @@
-package deepwit.transformer
+package deepwit.attention
 
 import dimwit.*
 import dimwit.Label as Λ

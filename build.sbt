@@ -30,6 +30,10 @@ lazy val core = (project in file("core"))
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
       "ch.contrafactus" %% "dimwit-core" % "0.1.0-SNAPSHOT" changing ()
     ),
+    // ScalaPy drives a single embedded CPython interpreter, and two suites importing jax at the same
+    // time race into a partially initialized module. Whichever suites happen to touch a tensor first
+    // then fail with a circular ImportError, so the suites run one after another.
+    Test / parallelExecution := false,
     Compile / packageSrc / publishArtifact := true,
     Compile / packageDoc / publishArtifact := true
   )

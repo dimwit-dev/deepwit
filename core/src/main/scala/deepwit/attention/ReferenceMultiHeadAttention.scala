@@ -1,4 +1,4 @@
-package deepwit.transformer.attention
+package deepwit.attention
 
 import dimwit.*
 import deepwit.base.AffineLayer
@@ -13,7 +13,7 @@ class ReferenceMultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
     createAttentionMask: Shape2[Target, Source] => Tensor2[Target, Source, Bool]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, TargetEmbedding, V]):
 
-  private val heads = params.heads.map(headParams => Attention(headParams, createAttentionMask))
+  private val heads = params.heads.map(headParams => CustomAttention(headParams, createAttentionMask))
   private val projectHeadValues = AffineLayer(params.outputProjection)
 
   override def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, TargetEmbedding, V] =

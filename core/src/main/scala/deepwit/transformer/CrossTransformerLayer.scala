@@ -3,7 +3,7 @@ package deepwit.transformer
 import dimwit.*
 import deepwit.normalization.LayerNorm
 import dimwit.Label as Λ
-import deepwit.transformer.attention.{MultiHeadSelfAttention, MultiHeadAttention}
+import deepwit.attention.{MultiHeadAttention, MultiHeadCustomAttention, MultiHeadCustomSelfAttention, MultiHeadSelfAttention}
 
 /** A single pre-norm transformer layer that additionally attends onto a cross context.
   *
@@ -25,10 +25,12 @@ class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, E
     createSelfAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
 ) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
 
-  private val selfAttention = MultiHeadSelfAttention[Context, Embedding, V](params.selfAttentionParams, createSelfAttentionMask)
+  // Left on the custom masks: this layer serves both the decoder and the bidirectional configuration,
+  // so it gets hard-coded only once it is split into those two on the way out of core.
+  private val selfAttention = MultiHeadCustomSelfAttention[Context, Embedding, V](params.selfAttentionParams, createSelfAttentionMask)
   private val selfAttentionPreNorm = LayerNorm(params.selfAttentionNormParams)
 
-  private val crossAttention = MultiHeadAttention(params.crossAttentionParams, createCrossAttentionMask)
+  private val crossAttention = MultiHeadCustomAttention(params.crossAttentionParams, createCrossAttentionMask)
   private val crossAttentionPreNorm = LayerNorm(params.crossAttentionNormParams)
 
   private val mlp = MLPEmbeddingMixer(params.mlpParams)
