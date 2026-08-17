@@ -36,7 +36,7 @@ abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
     val heads = headValues(source, target)
     heads.vmap(Axis[Target])(heads => projectHeadValues(heads.flatten))
 
-  protected def headValues(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]) =
+  protected def headValues(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor3[Head, Target, HeadValue, V] =
     zipvmap(Axis[Head])(params.queryWeights, params.keyWeights, params.valueWeights):
       case (q, k, v) =>
         headAttention(Attention.Params(q, k, v))(source, target)
@@ -91,6 +91,22 @@ class MultiHeadFullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, Target
   ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V] =
     FullAttention(sourceAxis, targetAxis, headParams)
 
+object MultiHeadFullAttention:
+
+  /** Runs on [[MultiHeadFusedFullAttention]] wherever cuDNN accepts the parameters and the hardware,
+    * and on the head-by-head formulation everywhere else.
+    */
+  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
+      sourceAxis: Axis[Source],
+      targetAxis: Axis[Target],
+      params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
+  ): MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V] =
+    if FusedAttention.canRun(params) then
+      // Guarded by the check above: it only passes when V is BFloat16.
+      MultiHeadFusedFullAttention(sourceAxis, targetAxis, params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]])
+        .asInstanceOf[MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
+    else new MultiHeadFullAttention(sourceAxis, targetAxis, params)
+
 /** Multi-head attention where a target position may only attend to source positions up to its own index.
   *
   * @param sourceAxis The axis of the source sequence. Names the label the source is attended over.
@@ -102,31 +118,26 @@ class MultiHeadCausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, Targ
     params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
 ) extends MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, V](params):
 
-  // TODO Run the fused kernel (`jax.nn.dot_product_attention` with `implementation = "cudnn"` and
-  //      `is_causal = true`) for half-precision element types on a CUDA device, keeping this
-  //      head-by-head formulation as the reference for every other case.
   override protected def headAttention(
       headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
   ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V] =
     CausalAttention(sourceAxis, targetAxis, headParams)
 
-  /* The sketch the fused path picks up from, kept against the old API:
+object MultiHeadCausalAttention:
 
-  val queries = context.dot(Axis[Embedding])(params.wq)
-  val keys = context.dot(Axis[Embedding])(params.wk)
-  val values = context.dot(Axis[Embedding])(params.wv)
-
-  val resJax = py.module("jax.nn").dot_product_attention(
-    PyBridge.toPyTensor(queries),
-    PyBridge.toPyTensor(keys),
-    PyBridge.toPyTensor(values),
-    is_causal = true,
-    implementation = "cudnn"
-  )
-
-  val attended = PyBridge.liftPyTensor(resJax).asInstanceOf[Tensor3[Context, Head, HeadValue, V]]
-  attended.vmap(Axis[Context])(headsForContext => projectHeadValues(headsForContext.flatten))
-   */
+  /** Runs on [[MultiHeadFusedCausalAttention]] wherever cuDNN accepts the parameters and the
+    * hardware, and on the head-by-head formulation everywhere else.
+    */
+  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
+      sourceAxis: Axis[Source],
+      targetAxis: Axis[Target],
+      params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
+  ): MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V] =
+    if FusedAttention.canRun(params) then
+      // Guarded by the check above: it only passes when V is BFloat16.
+      MultiHeadFusedCausalAttention(sourceAxis, targetAxis, params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]])
+        .asInstanceOf[MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
+    else new MultiHeadCausalAttention(sourceAxis, targetAxis, params)
 
 /** Multi-head attention restricted by a caller-supplied mask.
   *
