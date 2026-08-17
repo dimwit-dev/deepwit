@@ -38,7 +38,7 @@ class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
 object MultiHeadAttention:
 
   case class Params[SourceEmbedding, TargetEmbedding, V](
-      queryWeights: Tensor3[Head, TargetEmbedding, HeadQuery, V], // TODO update to List[Attention.Params] => Check performance
+      queryWeights: Tensor3[Head, TargetEmbedding, HeadQuery, V],
       keyWeights: Tensor3[Head, SourceEmbedding, HeadKey, V],
       valueWeights: Tensor3[Head, SourceEmbedding, HeadValue, V],
       outputProjection: AffineLayer.Params[Head |*| HeadValue, TargetEmbedding, V]
