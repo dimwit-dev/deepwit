@@ -5,6 +5,23 @@ import deepwit.normalization.LayerNorm
 import deepwit.attention.{MultiHeadCausalSelfAttention, MultiHeadSelfAttention}
 import dimwit.Label as Λ
 
+/** The residual skeleton of a transformer layer.
+  *
+  * The context is mixed along itself and then along the embedding, each on its own residual branch.
+  * What each mixer is remains open to the implementation.
+  */
+trait TransformerBlock[Context: Λ, Embedding: Λ, V: IsFloating](
+    contextAxis: Axis[Context]
+) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
+
+  override final def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+    val contextMixed = context + contextMixer(context)
+    contextMixed + contextMixed.vmap(Axis[Context])(embeddingMixer)
+
+  protected def embeddingMixer(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V]
+
+  protected def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V]
+
 /** A single layer of the GPT-2 transformer, mixing along the context and then along the embedding.
   *
   * Every choice here is GPT-2's rather than a theorem: causal self-attention, LayerNorm ahead of
@@ -17,10 +34,10 @@ import dimwit.Label as Λ
   * @param contextAxis The axis of the sequence attending onto itself.
   * @param params The learnable parameters.
   */
-class TransformerLayer[Context: Λ, Embedding: Λ, V: IsFloating](
+class CausalTransformerLayer[Context: Λ, Embedding: Λ, V: IsFloating](
     contextAxis: Axis[Context],
-    params: TransformerLayer.Params[Embedding, V]
-) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
+    params: CausalTransformerLayer.Params[Embedding, V]
+) extends TransformerBlock[Context, Embedding, V](contextAxis):
 
   private val selfAttention = MultiHeadCausalSelfAttention(contextAxis, params.attentionParams)
   private val selfAttentionPreNorm = LayerNorm(params.attentionNormParams)
@@ -28,17 +45,13 @@ class TransformerLayer[Context: Λ, Embedding: Λ, V: IsFloating](
   private val mlp = MLPEmbeddingMixer(params.mlpParams)
   private val mlpPreNorm = LayerNorm(params.mlpNormParams)
 
-  override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
-    val contextMixed = context + contextMixer(context)
-    contextMixed + contextMixed.vmap(Axis[Context])(embeddingMixer)
-
-  private def embeddingMixer(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
+  override protected def embeddingMixer(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
     mlp(mlpPreNorm(embedding))
 
-  private def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+  override protected def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     selfAttention(context.vmap(Axis[Context])(selfAttentionPreNorm))
 
-object TransformerLayer:
+object CausalTransformerLayer:
 
   case class Params[Embedding, V](
       attentionParams: MultiHeadSelfAttention.Params[Embedding, V],

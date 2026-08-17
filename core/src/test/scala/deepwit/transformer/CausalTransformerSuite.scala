@@ -7,7 +7,7 @@ import dimwit.Conversions.given
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec
 
-class TransformerSuite extends AnyFunSpec with Matchers:
+class CausalTransformerSuite extends AnyFunSpec with Matchers:
 
   trait Ctx derives Label
   trait Emb derives Label
@@ -16,7 +16,7 @@ class TransformerSuite extends AnyFunSpec with Matchers:
   private val ctxExtent = Axis[Ctx] -> 4
   private val embExtent = Axis[Emb] -> 4
 
-  private def params = Transformer.Params.xavierUniformDepthScaled(
+  private def params = CausalTransformer.Params.xavierUniformDepthScaled(
     numTransformerLayers = numLayers,
     numHeads = 2,
     embeddingExtent = embExtent,
@@ -45,33 +45,33 @@ class TransformerSuite extends AnyFunSpec with Matchers:
       )
     )
 
-  describe("Transformer"):
+  describe("CausalTransformer"):
 
     it("preserves the shape of the context"):
-      val result = Transformer(Axis[Ctx], params)(context(13f))
+      val result = CausalTransformer(Axis[Ctx], params)(context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
     it("is just the final normalization when it has no layers"):
       val normParams = LayerNorm.Params.identity(embExtent, VType[Float32])
-      val transformer = Transformer(Axis[Ctx], Transformer.Params(List.empty, normParams))
+      val transformer = CausalTransformer(Axis[Ctx], CausalTransformer.Params(List.empty, normParams))
       val x = context(13f)
       transformer(x) should approxEqual(x.vmap(Axis[Ctx])(LayerNorm(normParams)), 1e-5f)
 
     it("keeps earlier positions independent of later ones, being causal"):
-      val transformer = Transformer(Axis[Ctx], params)
+      val transformer = CausalTransformer(Axis[Ctx], params)
       val a = transformer(context(13f))
       val b = transformer(context(-99f))
       a.slice(Axis[Ctx].at(0 until 3)) should approxEqual(b.slice(Axis[Ctx].at(0 until 3)), 1e-4f)
       (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
     it("lets later positions see the earlier ones"):
-      val transformer = Transformer(Axis[Ctx], params)
+      val transformer = CausalTransformer(Axis[Ctx], params)
       val a = transformer(firstRowVaried(1f))
       val b = transformer(firstRowVaried(-99f))
       (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
-  describe("Transformer.Params.xavierUniformDepthScaled"):
+  describe("CausalTransformer.Params.xavierUniformDepthScaled"):
 
     it("builds one parameter set per layer plus the final normalization"):
       val p = params

@@ -7,7 +7,7 @@ import dimwit.Conversions.given
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec
 
-class TransformerLayerSuite extends AnyFunSpec with Matchers:
+class CausalTransformerLayerSuite extends AnyFunSpec with Matchers:
 
   trait Ctx derives Label
   trait Emb derives Label
@@ -15,7 +15,7 @@ class TransformerLayerSuite extends AnyFunSpec with Matchers:
   private val ctxExtent = Axis[Ctx] -> 4
   private val embExtent = Axis[Emb] -> 4
 
-  private def params = TransformerLayer.Params.xavierUniformDepthScaled(
+  private def params = CausalTransformerLayer.Params.xavierUniformDepthScaled(
     numTransformerLayers = 2,
     numHeads = 2,
     embeddingExtent = embExtent,
@@ -25,7 +25,7 @@ class TransformerLayerSuite extends AnyFunSpec with Matchers:
   )
 
   /** Zeroes both residual branches, leaving only the identity paths. */
-  private def zeroedBranches(p: TransformerLayer.Params[Emb, Float32]) =
+  private def zeroedBranches(p: CausalTransformerLayer.Params[Emb, Float32]) =
     def zeroAffine[In: Label, Out: Label](a: AffineLayer.Params[In, Out, Float32]) =
       AffineLayer.Params(Tensor.like(a.weight).fill(0f), Tensor.like(a.bias).fill(0f))
     p.copy(
@@ -43,32 +43,32 @@ class TransformerLayerSuite extends AnyFunSpec with Matchers:
       )
     )
 
-  describe("TransformerLayer"):
+  describe("CausalTransformerLayer"):
 
     it("preserves the shape of the context"):
-      val layer = TransformerLayer(Axis[Ctx], params)
+      val layer = CausalTransformerLayer(Axis[Ctx], params)
       val result = layer(context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
     it("is the identity when both residual branches are zeroed"):
-      val layer = TransformerLayer(Axis[Ctx], zeroedBranches(params))
+      val layer = CausalTransformerLayer(Axis[Ctx], zeroedBranches(params))
       val x = context(13f)
       layer(x) should approxEqual(x, 1e-5f)
 
     it("changes the context when the branches are not zeroed"):
-      val layer = TransformerLayer(Axis[Ctx], params)
+      val layer = CausalTransformerLayer(Axis[Ctx], params)
       val x = context(13f)
       (layer(x) - x).abs.max.item should be > 1e-3f
 
     it("keeps earlier positions independent of later ones, being causal"):
-      val layer = TransformerLayer(Axis[Ctx], params)
+      val layer = CausalTransformerLayer(Axis[Ctx], params)
       val a = layer(context(13f))
       val b = layer(context(-99f))
       a.slice(Axis[Ctx].at(0 until 3)) should approxEqual(b.slice(Axis[Ctx].at(0 until 3)), 1e-4f)
       (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
-  describe("TransformerLayer.Params.xavierUniformDepthScaled"):
+  describe("CausalTransformerLayer.Params.xavierUniformDepthScaled"):
 
     it("builds attention, mixer and both pre-norms"):
       val p = params

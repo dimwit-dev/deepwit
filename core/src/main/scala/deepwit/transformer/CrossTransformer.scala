@@ -3,26 +3,28 @@ package deepwit.transformer
 import dimwit.*
 import dimwit.Label as Λ
 import deepwit.normalization.LayerNorm
-import deepwit.attention.{causalMask, fullMask}
 
 /** A stack of [[CrossTransformerLayer]]s followed by a final normalization.
+  *
+  * Unrestricted in both directions, as its layers are. This is a composed architecture rather than
+  * a building block, and is slated to move out of core.
   *
   * @tparam CrossContext The axis label for the cross sequence.
   * @tparam CrossEmbedding The axis label for the cross embedding space.
   * @tparam Context The axis label for the sequence.
   * @tparam Embedding The axis label for the embedding space.
   * @tparam V The floating-point scalar type of the tensor elements.
+  * @param crossContextAxis The axis of the sequence being attended onto.
+  * @param contextAxis The axis of the sequence attending onto itself and onto the cross context.
   * @param params The learnable parameters.
-  * @param createCrossAttentionMask A function generating a boolean mask for the cross-attention.
-  * @param createSelfAttentionMask A function generating a boolean mask for the self-attention.
   */
 class CrossTransformer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedding: Λ, V: IsFloating](
-    params: CrossTransformer.Params[CrossEmbedding, Embedding, V],
-    createCrossAttentionMask: Shape2[Context, CrossContext] => Tensor2[Context, CrossContext, Bool],
-    createSelfAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
+    crossContextAxis: Axis[CrossContext],
+    contextAxis: Axis[Context],
+    params: CrossTransformer.Params[CrossEmbedding, Embedding, V]
 ) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
 
-  private val layers = params.transformerLayers.map(p => CrossTransformerLayer(p, createCrossAttentionMask, createSelfAttentionMask))
+  private val layers = params.transformerLayers.map(p => CrossTransformerLayer(crossContextAxis, contextAxis, p))
   private val finalNorm = LayerNorm(params.finalNorm)
 
   override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
@@ -38,34 +40,6 @@ class CrossTransformer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedd
     (hiddenStates, res.vmap(Axis[Context])(finalNorm))
 
 object CrossTransformer:
-
-  /** A cross transformer in decoder configuration: causal over its own context, unrestricted onto the cross context. */
-  def decoder[CrossContext: Λ, Context: Λ, CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](
-      crossAxis: Axis[CrossContext],
-      axis: Axis[Context],
-      params: CrossTransformer.Params[CrossEmbedding, Embedding, V]
-  ): CrossTransformer[CrossContext, CrossEmbedding, Context, Embedding, V] = CrossTransformer(
-    params,
-    createCrossAttentionMask = fullMask[Context, CrossContext],
-    createSelfAttentionMask = causalMask[Context, Context]
-  )
-
-  /** A cross transformer unrestricted in both directions: over its own context as well as onto
-    * the cross context.
-    *
-    * The counterpart of [[decoder]] for a context that is a set rather than a sequence, such as
-    * the object queries of a detection model, where every position has to see every other one to
-    * settle what it stands for.
-    */
-  def bidirectional[CrossContext: Λ, Context: Λ, CrossEmbedding: Λ, Embedding: Λ, V: IsFloating](
-      crossAxis: Axis[CrossContext],
-      axis: Axis[Context],
-      params: CrossTransformer.Params[CrossEmbedding, Embedding, V]
-  ): CrossTransformer[CrossContext, CrossEmbedding, Context, Embedding, V] = CrossTransformer(
-    params,
-    createCrossAttentionMask = fullMask[Context, CrossContext],
-    createSelfAttentionMask = fullMask[Context, Context]
-  )
 
   case class Params[CrossEmbedding, Embedding, V](
       transformerLayers: List[CrossTransformerLayer.Params[CrossEmbedding, Embedding, V]],

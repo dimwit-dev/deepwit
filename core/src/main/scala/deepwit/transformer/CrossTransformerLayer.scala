@@ -3,51 +3,69 @@ package deepwit.transformer
 import dimwit.*
 import deepwit.normalization.LayerNorm
 import dimwit.Label as Λ
-import deepwit.attention.{MultiHeadAttention, MultiHeadCustomAttention, MultiHeadCustomSelfAttention, MultiHeadSelfAttention}
+import deepwit.attention.{MultiHeadAttention, MultiHeadSelfAttention, MultiHeadFullAttention, MultiHeadFullSelfAttention}
+
+/** The residual skeleton of a transformer layer that additionally attends onto a cross context.
+  *
+  * The context is mixed along itself, then along the cross context, and finally along the embedding,
+  * each on its own residual branch. What each mixer is remains open to the implementation.
+  */
+trait CrossTransformerBlock[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedding: Λ, V: IsFloating](
+    crossContextAxis: Axis[CrossContext],
+    contextAxis: Axis[Context]
+) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
+
+  override final def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+    val contextMixed = context + contextMixer(context)
+    val crossContextMixed = contextMixed + crossContextMixer(crossContext, contextMixed)
+    crossContextMixed + crossContextMixed.vmap(Axis[Context])(embeddingMixer)
+
+  protected def embeddingMixer(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V]
+
+  protected def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V]
+
+  protected def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V]
 
 /** A single pre-norm transformer layer that additionally attends onto a cross context.
   *
   * The context is mixed along itself (self-attention), then along the cross context
-  * (cross-attention), and finally along the embedding.
+  * (cross-attention), and finally along the embedding. Attention is unrestricted in both
+  * directions, which suits a context that is a set rather than a sequence — the object queries of a
+  * detection model, say, where every position has to see every other one to settle what it stands
+  * for. This is a composed architecture rather than a building block, and is slated to move out of
+  * core.
   *
   * @tparam CrossContext The axis label for the cross sequence.
   * @tparam CrossEmbedding The axis label for the cross embedding space.
   * @tparam Context The axis label for the sequence.
   * @tparam Embedding The axis label for the embedding space.
   * @tparam V The floating-point scalar type of the tensor elements.
+  * @param crossContextAxis The axis of the sequence being attended onto.
+  * @param contextAxis The axis of the sequence attending onto itself and onto the cross context.
   * @param params The learnable parameters.
-  * @param createCrossAttentionMask A function generating a boolean mask for the cross-attention.
-  * @param createSelfAttentionMask A function generating a boolean mask for the self-attention.
   */
 class CrossTransformerLayer[CrossContext: Λ, CrossEmbedding: Λ, Context: Λ, Embedding: Λ, V: IsFloating](
-    params: CrossTransformerLayer.Params[CrossEmbedding, Embedding, V],
-    createCrossAttentionMask: Shape2[Context, CrossContext] => Tensor2[Context, CrossContext, Bool],
-    createSelfAttentionMask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
-) extends ((Tensor2[CrossContext, CrossEmbedding, V], Tensor2[Context, Embedding, V]) => Tensor2[Context, Embedding, V]):
+    crossContextAxis: Axis[CrossContext],
+    contextAxis: Axis[Context],
+    params: CrossTransformerLayer.Params[CrossEmbedding, Embedding, V]
+) extends CrossTransformerBlock[CrossContext, CrossEmbedding, Context, Embedding, V](crossContextAxis, contextAxis):
 
-  // Left on the custom masks: this layer serves both the decoder and the bidirectional configuration,
-  // so it gets hard-coded only once it is split into those two on the way out of core.
-  private val selfAttention = MultiHeadCustomSelfAttention[Context, Embedding, V](params.selfAttentionParams, createSelfAttentionMask)
+  private val selfAttention = MultiHeadFullSelfAttention[Context, Embedding, V](contextAxis, params.selfAttentionParams)
   private val selfAttentionPreNorm = LayerNorm(params.selfAttentionNormParams)
 
-  private val crossAttention = MultiHeadCustomAttention(params.crossAttentionParams, createCrossAttentionMask)
+  private val crossAttention = MultiHeadFullAttention(crossContextAxis, contextAxis, params.crossAttentionParams)
   private val crossAttentionPreNorm = LayerNorm(params.crossAttentionNormParams)
 
   private val mlp = MLPEmbeddingMixer(params.mlpParams)
   private val mlpPreNorm = LayerNorm(params.mlpNormParams)
 
-  override def apply(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
-    val contextMixed = context + contextMixer(context)
-    val crossContextMixed = contextMixed + crossContextMixer(crossContext, contextMixed)
-    crossContextMixed + crossContextMixed.vmap(Axis[Context])(embeddingMixer)
-
-  private def embeddingMixer(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
+  override protected def embeddingMixer(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
     mlp(mlpPreNorm(embedding))
 
-  private def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+  override protected def contextMixer(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     selfAttention(context.vmap(Axis[Context])(selfAttentionPreNorm))
 
-  private def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+  override protected def crossContextMixer(crossContext: Tensor2[CrossContext, CrossEmbedding, V], context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     crossAttention(crossContext, context.vmap(Axis[Context])(crossAttentionPreNorm))
 
 object CrossTransformerLayer:

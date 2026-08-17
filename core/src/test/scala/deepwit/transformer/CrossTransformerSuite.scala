@@ -1,7 +1,6 @@
 package deepwit.transformer
 
 import deepwit.*
-import deepwit.attention.{causalMask, fullMask}
 import deepwit.normalization.LayerNorm
 import dimwit.*
 import dimwit.Conversions.given
@@ -47,32 +46,25 @@ class CrossTransformerSuite extends AnyFunSpec with Matchers:
   describe("CrossTransformer"):
 
     it("preserves the shape of the context"):
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], params())
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], params())
       val result = transformer(crossContext(), context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
     it("is just the final normalization when it has no layers"):
       val normParams = LayerNorm.Params.identity(embExtent, VType[Float32])
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], CrossTransformer.Params[CrossEmb, Emb, Float32](List.empty, normParams))
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], CrossTransformer.Params[CrossEmb, Emb, Float32](List.empty, normParams))
       val x = context(13f)
       transformer(crossContext(), x) should approxEqual(x.vmap(Axis[Ctx])(LayerNorm(normParams)), 1e-5f)
 
     it("attends onto a cross context whose embedding space differs from its own"):
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], params(Axis[CrossEmb] -> 6))
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], params(Axis[CrossEmb] -> 6))
       val result = transformer(crossContext(embeddingSize = 6), context(13f))
       result.shape(Axis[Ctx]) shouldBe 4
       result.shape(Axis[Emb]) shouldBe 4
 
-    it("is causal in its own context in the decoder configuration"):
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], params())
-      val a = transformer(crossContext(), context(13f))
-      val b = transformer(crossContext(), context(-99f))
-      a.slice(Axis[Ctx].at(0 until 3)) should approxEqual(b.slice(Axis[Ctx].at(0 until 3)), 1e-4f)
-      (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
-
-    it("exposes later positions to earlier ones in the bidirectional configuration"):
-      val transformer = CrossTransformer.bidirectional(Axis[CrossCtx], Axis[Ctx], params())
+    it("lets every position see every other one, self-attending in full"):
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], params())
       val a = transformer(crossContext(), context(13f))
       val b = transformer(crossContext(), context(-99f))
       (a.slice(Axis[Ctx].at(0 until 3)) - b.slice(Axis[Ctx].at(0 until 3))).abs.max.item should be > 1e-3f
@@ -80,12 +72,12 @@ class CrossTransformerSuite extends AnyFunSpec with Matchers:
   describe("CrossTransformer.applyWithHiddenStates"):
 
     it("returns one hidden state per layer"):
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], params())
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], params())
       val (hiddenStates, _) = transformer.applyWithHiddenStates(crossContext(), context(13f))
       hiddenStates.size shouldBe numLayers
 
     it("normalizes its last hidden state into the same result as apply"):
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], params())
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], params())
       val cross = crossContext()
       val x = context(13f)
       val (hiddenStates, result) = transformer.applyWithHiddenStates(cross, x)
@@ -94,7 +86,7 @@ class CrossTransformerSuite extends AnyFunSpec with Matchers:
       result should approxEqual(normalized, 1e-5f)
 
     it("does not include the initial context among the hidden states"):
-      val transformer = CrossTransformer.decoder(Axis[CrossCtx], Axis[Ctx], params())
+      val transformer = CrossTransformer(Axis[CrossCtx], Axis[Ctx], params())
       val x = context(13f)
       val (hiddenStates, _) = transformer.applyWithHiddenStates(crossContext(), x)
       (hiddenStates.head - x).abs.max.item should be > 1e-3f

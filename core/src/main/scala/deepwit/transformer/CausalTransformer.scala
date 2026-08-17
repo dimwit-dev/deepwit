@@ -15,12 +15,12 @@ import dimwit.Label as Λ
   * @param contextAxis The axis of the sequence attending onto itself.
   * @param params The learnable parameters.
   */
-class Transformer[Context: Λ, Embedding: Λ, V: IsFloating](
+class CausalTransformer[Context: Λ, Embedding: Λ, V: IsFloating](
     contextAxis: Axis[Context],
-    params: Transformer.Params[Embedding, V]
+    params: CausalTransformer.Params[Embedding, V]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
-  private val layers = params.transformerLayers.map(this.transformerLayer)
+  private val layers = params.transformerLayers.map(p => CausalTransformerLayer(contextAxis, p))
   private val finalNorm = LayerNorm(params.finalNorm)
 
   override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
@@ -28,12 +28,10 @@ class Transformer[Context: Λ, Embedding: Λ, V: IsFloating](
       case (context_i, layer) => layer(context_i)
     res.vmap(Axis[Context])(finalNorm)
 
-  protected def transformerLayer(params: TransformerLayer.Params[Embedding, V]) = TransformerLayer(contextAxis, params)
-
-object Transformer:
+object CausalTransformer:
 
   case class Params[Embedding, V](
-      transformerLayers: List[TransformerLayer.Params[Embedding, V]],
+      transformerLayers: List[CausalTransformerLayer.Params[Embedding, V]],
       finalNorm: LayerNorm.Params[Embedding, V]
   )
 
@@ -43,7 +41,7 @@ object Transformer:
       new Params[Embedding, V](
         transformerLayers =
           key.split(numTransformerLayers).map: key =>
-            TransformerLayer.Params.xavierUniformDepthScaled(numTransformerLayers, numHeads, embeddingExtent, embeddingMixedExtent, vtype, key)
+            CausalTransformerLayer.Params.xavierUniformDepthScaled(numTransformerLayers, numHeads, embeddingExtent, embeddingMixedExtent, vtype, key)
           .toList,
         finalNorm = LayerNorm.Params.identity(embeddingExtent, vtype)
       )
