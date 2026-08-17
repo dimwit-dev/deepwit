@@ -1,25 +1,36 @@
-/** TODO
-  * - GradScaler and BFloat16 support
-  * - Increase batch size (gradient accumulation)
-  */
-
 package deepwit.examples.gpt
+import deepwit.checkpointing.TensorTreeCheckpointer
+import deepwit.transformer.EmbeddingMixed
+import deepwit.loss.CategoricalCrossEntropy
 
 import dimwit.*
 import dimwit.Conversions.given
 import deepwit.training.tapEvery
-import dimwit.optimizer.{Adam, AdamState, AdamW}
-import dimwit.TreeOf.ops.asFloats
+import deepwit.optimizer.*
+import dimwit.optimizer.{AdamW, Adam, AdamState}
+import dimwit.TreeOf.ops.*
+
+import java.io.{FileWriter, PrintWriter, File}
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import FineWebDataset.{BatchSample, batchStream}
-import deepwit.transformer.EmbeddingMixed
-import deepwit.loss.CategoricalCrossEntropy
+
+import dimwit.TreeOf.map
+import me.shadaj.scalapy.py
+
+import deepwit.optimizer.LearningRateSchedule
+import deepwit.optimizer.LearningRateSchedules.LinearWarmup
 
 object Config:
-  val batchSize = 64
-  val learningRate = 1e-4f
+  val runningBatchSize = 64 // 12
+  val effectiveBatchSize = 512
+  val accumulationSteps = effectiveBatchSize / runningBatchSize
+  val baseLearningRate = 6e-4f
+  val minLearningRate = baseLearningRate / 10f
   val beta1 = 0.9f
-  val beta2 = 0.99f
-  val weightDecayFactor = 0.01f
+  val beta2 = 0.95f
+  val gradientClipNorm: Float = 1.0f
+  val weightDecayFactor = 0.1f
 
   val numLayers = 12
   val vocabExtent = Axis[Vocab] -> 50304
@@ -27,6 +38,11 @@ object Config:
   val numHeads = 12
   val embeddingExtent = Axis[Embedding] -> 64 * numHeads
   val embeddingMixedExtent = Axis[EmbeddingMixed] -> 3072
+
+  val valTokens = 10485760
+  val valSamples = valTokens / contextExtent.size
+  val valRunningBatchSize = runningBatchSize
+  val numBatchesPerValidation = valSamples / valRunningBatchSize
 
 object DebugConfig:
   val batchSize = 1
@@ -45,9 +61,6 @@ object DebugConfig:
 import Config.*
 
 @main def train(): Unit =
-
-  /** Helper-Type to mark np.memmap tensor */
-
   val key = Random.Key.fromTime()
 
   val (dataKey, initParamsKey) = key.split2()
@@ -62,19 +75,18 @@ import Config.*
     initParamsKey
   )
 
-  val adamW = AdamW(
-    Adam(learningRate = learningRate, beta1 = beta1, beta2 = beta2),
-    weightDecayFactor = weightDecayFactor
-  )
+  val schedule = LinearWarmup(baseLearningRate, 1_000).followBy(CosineDecay(baseLearningRate, minLearningRate, 20_000))
+  val opt = LearningRateScheduler(lr => AdamW(Adam(lr, beta1 = beta1, beta2 = beta2), weightDecayFactor = weightDecayFactor), schedule)
 
   case class TrainingState(
       params: GPT.Params[Float32],
-      adamWState: AdamState[GPT.Params[Float32]],
+      optState: LearningRateSchedulerState[GPT.Params[Float32], AdamState],
       stepCost: Tensor0[Float32]
   )
 
   val (trainKey, valKey) = dataKey.split2()
-  val trainStream = batchStream("/home/mebr/Documents/Scala/modded-nanogpt/data/fineweb10B", "fineweb_train_", batchSize, contextExtent.size, trainKey)
+  val trainStream = batchStream("/home/mebr/Documents/Scala/modded-nanogpt/data/fineweb10B", "fineweb_train_", runningBatchSize, contextExtent.size, trainKey)
+  val valStream = batchStream("/home/mebr/Documents/Scala/modded-nanogpt/data/fineweb10B", "fineweb_val_", runningBatchSize, contextExtent.size, valKey)
 
   def loss[V: IsFloating](
       targets: Tensor1[Context, Int32],
@@ -93,48 +105,106 @@ import Config.*
         val logits = model.logits(inputs)
         loss(targets, logits)
     losses.mean
+  val jitCostFn = jit: (params: GPT.Params[BFloat16], batchSample: BatchSample) =>
+    costFunFor(batchSample)(params)
 
-  def gradientStep[V: IsFloating](
+  def calcGradients(
       batchSample: BatchSample,
+      params: GPT.Params[BFloat16]
+  ): (Tensor0[BFloat16], Grad[GPT.Params[BFloat16]]) =
+    val costFn = costFunFor[BFloat16](batchSample)
+    Autodiff.valueAndGrad(costFn)(params)
+
+  val jitCalcGradients = jit(calcGradients)
+  val jitAdamWUpdate = jitDonatingUnsafe(opt.update[GPT.Params[Float32], Float32])
+
+  def gradientDescentStep(
+      runningBatchSamples: List[BatchSample],
       state: TrainingState
   ): TrainingState =
-    val costFn = costFunFor[BFloat16](batchSample)
     val paramsF16 = state.params.asFloats(VType[BFloat16])
-    val (stepCost, grads) = Autodiff.valueAndGrad(costFn)(paramsF16)
-    val gradsF32 = Grad.asFloats(grads)(VType[Float32])
-    val (params, adamWState) = adamW.update(gradsF32, state.params, state.adamWState)
-    TrainingState(params, adamWState, stepCost.asFloat32)
 
-  val jitGradientStep = jitDonatingUnsafe(gradientStep[Float32])
+    val initialGrads = state.params.map([T <: Tuple] => (labels: Labels[T]) ?=> (x: Tensor[T, Float32]) => Tensor.like(x).fill(0f))
+    val (accumulatedCosts, accumulatedGrads) =
+      runningBatchSamples.foldLeft((Tensor0(0f), initialGrads)):
+        case ((accCosts, accGrads), batchSample) =>
+          val (costs, grads) = jitCalcGradients(batchSample, paramsF16)
+
+          val newAccCosts = accCosts + costs.asFloat32 / accumulationSteps
+          val newAccGrads = accGrads ++ grads.value.asFloats(VType[Float32]) `//!` accumulationSteps
+
+          (newAccCosts, newAccGrads)
+
+    val (params, optState) = jitAdamWUpdate(
+      Grad(accumulatedGrads).clipGlobalNorm(gradientClipNorm),
+      state.params,
+      state.optState
+    )
+
+    val scalarLoss = accumulatedCosts.item
+    TrainingState(params, optState, Tensor0(scalarLoss))
+
+  val jitGradientDescentStep = gradientDescentStep
+
+  val initState = TrainingState(initParams, opt.init(initParams), Tensor0(-1f))
 
   def miniBatchGradientDescent(
       samples: Iterator[BatchSample],
       startState: TrainingState
   ): Iterator[TrainingState] =
-    samples.scanLeft(startState):
-      case (state, sample) =>
-        System.gc()
-        jitGradientStep(sample, state)
+    samples.grouped(accumulationSteps).scanLeft(startState):
+      case (state, runningBatches) =>
+        jitGradientDescentStep(runningBatches.toList, state)
 
-  val initState = TrainingState(initParams, adamW.init(initParams), Tensor0(-1f))
   val trainTrajectory = miniBatchGradientDescent(trainStream, initState)
+
+  // Initialize CSV File
+  val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+  val logger = TensorTreeCheckpointer(f"out/GPT-2/$time")
+
+  val csvFile = new File(s"training_log_$time.csv")
+  val writer = new PrintWriter(new FileWriter(csvFile, true), true)
+
+  val headers = List("timestamp", "step", "tokens_per_s", "samples_per_s", "s_per_batch", "learning_rate", "step_cost")
+  writer.println(headers.mkString(","))
+
   val timer = Timer.start()
   println("Training...")
+
   val finalState = trainTrajectory
     .drop(1)
     .tapEvery(1):
-      case (state, iter) =>
+      case (state, _) =>
+        val step = state.optState.step.item
         // Training report
         timer.tick()
         val secondsPerBatch = timer.runningAvgSeconds
-        println(
-          List(
-            s"iter $iter",
-            f"tokens/s: ${(batchSize * contextExtent.size) / (secondsPerBatch)}%.2f",
-            f"samples/s: ${batchSize / (secondsPerBatch)}%.2f",
-            f"s/batch: $secondsPerBatch%.2f",
-            f"stepCost ${state.stepCost.item}%.2f"
-          ).mkString(", ")
+        val logData = Map(
+          "timestamp" -> java.time.Instant.now().toString,
+          "step" -> step,
+          "tokens_per_s" -> f"${(effectiveBatchSize * contextExtent.size) / (secondsPerBatch)}%.2f",
+          "samples_per_s" -> f"${effectiveBatchSize / (secondsPerBatch)}%.2f",
+          "s_per_batch" -> f"$secondsPerBatch%.2f",
+          "learning_rate" -> f"${schedule(step)}",
+          "step_cost" -> f"${state.stepCost.item}%.2f"
         )
+        writer.println(headers.map(h => logData(h)).mkString(","))
+        println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
+    .tapEvery(1_000):
+      case (state, _) =>
+        val step = state.optState.step.item
+        println("-" * 30)
+        println(s"Performing validation at step $step...")
+        val params = state.params.asFloats(VType[BFloat16])
+        val avgValLoss = (1 to numBatchesPerValidation).iterator
+          .map:
+            case _ =>
+              val valBatch = valStream.next()
+              jitCostFn(params, valBatch).asFloat32.item
+          .sum / numBatchesPerValidation
+        println(s"Validation cost $step: ${avgValLoss}")
+        logger.save(state, step)
+        println(s"Checkpoint saved")
+        println("-" * 30)
     .drop(1_000_000_000)
     .next()

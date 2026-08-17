@@ -51,13 +51,11 @@ lazy val examples = (project in file("examples"))
     // Examples source directory
     Compile / scalaSource := baseDirectory.value,
     Compile / resourceDirectory := baseDirectory.value / "src" / "main" / "resources",
-    javaOptions ++= {
-      if (sys.props("os.name").toLowerCase.contains("mac")) {
-        Seq("-XstartOnFirstThread") // For MacOS to run Python with GUI support
-      } else {
-        Seq.empty
-      }
-    }
+    javaOptions ++= Seq(
+      // "-XX:G1PeriodicGCInterval=1000"
+      "-XX:+UseZGC",
+      "-XX:ZCollectionInterval=1" // Forces a GC cycle every 1 second, regardless of heap usage
+    )
   )
 
 lazy val uvPython: String =
