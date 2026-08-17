@@ -12,6 +12,7 @@ import dimwit.Label as Λ
   * @tparam Key The axis label for the key space.
   * @tparam V The floating-point scalar type of the tensor elements.
   */
+@FunctionalInterface
 trait AttentionScore[Target, Source, Query, Key, V] extends ((Tensor2[Target, Query, V], Tensor2[Source, Key, V]) => Tensor2[Target, Source, V])
 
 /** Scores a query against a key by their dot product, scaled down by the square root of the key extent.

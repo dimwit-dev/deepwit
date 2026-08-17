@@ -35,12 +35,48 @@ object FusedAttention:
       target: Tensor2[Target, TargetEmbedding, BFloat16],
       isCausal: Boolean
   ): Tensor3[Head, Target, HeadValue, BFloat16] =
+    headFirst(attend(params, source, target, isCausal).attended)
+
+  /** The same, with the projections the kernel attended from.
+    *
+    * The kernel needs those projections anyway, so reporting them costs only their transposes —
+    * which is the reason [[MultiHeadAttention.Intermediates]] stops short of the attention weights.
+    */
+  private[attention] def headValuesWithIntermediates[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ](
+      params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16],
+      source: Tensor2[Source, SourceEmbedding, BFloat16],
+      target: Tensor2[Target, TargetEmbedding, BFloat16],
+      isCausal: Boolean
+  ): (Tensor3[Head, Target, HeadValue, BFloat16], MultiHeadAttention.Intermediates[Source, Target, BFloat16]) =
+    val attention = attend(params, source, target, isCausal)
+    (
+      headFirst(attention.attended),
+      (
+        queries = headFirst(attention.queries),
+        keys = headFirst(attention.keys),
+        values = headFirst(attention.values)
+      )
+    )
+
+  /** Everything the kernel touches, in the sequence-first layout it works in. */
+  private def attend[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ](
+      params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16],
+      source: Tensor2[Source, SourceEmbedding, BFloat16],
+      target: Tensor2[Target, TargetEmbedding, BFloat16],
+      isCausal: Boolean
+  ): (
+      attended: Tensor3[Target, Head, HeadValue, BFloat16],
+      queries: Tensor3[Target, Head, HeadQuery, BFloat16],
+      keys: Tensor3[Source, Head, HeadKey, BFloat16],
+      values: Tensor3[Source, Head, HeadValue, BFloat16]
+  ) =
     // Projecting every head at once already gives the (sequence, head, head space) layout the kernel
     // wants; only the batch axis this attention does not have has to be faked and dropped again.
     val queries = target.dot(Axis[TargetEmbedding])(params.queryWeights)
     val keys = source.dot(Axis[SourceEmbedding])(params.keyWeights)
     val values = source.dot(Axis[SourceEmbedding])(params.valueWeights)
 
+    // The kernel scales by one over the square root of the query space, as `ScaledDotProduct` does.
     val attended = jaxNn.dot_product_attention(
       batched(queries),
       batched(keys),
@@ -49,10 +85,20 @@ object FusedAttention:
       implementation = "cudnn"
     )
 
-    // The kernel scales by one over the square root of the query space, as `ScaledDotProduct` does.
-    // It answers in (target, head, head space); the head-by-head formulation leads with the head.
-    val headFirst = Jax.jnp.transpose(Jax.jnp.squeeze(attended, 0), Seq(1, 0, 2).toPythonCopy)
-    PyBridge.liftPyTensor[(Head, Target, HeadValue), BFloat16](headFirst)
+    (
+      attended = PyBridge.liftPyTensor[(Target, Head, HeadValue), BFloat16](Jax.jnp.squeeze(attended, 0)),
+      queries = queries,
+      keys = keys,
+      values = values
+    )
+
+  /** The head-by-head formulation leads with the head, where the kernel leads with the sequence. */
+  private def headFirst[Sequence: Λ, HeadSpace: Λ](
+      tensor: Tensor3[Sequence, Head, HeadSpace, BFloat16]
+  ): Tensor3[Head, Sequence, HeadSpace, BFloat16] =
+    PyBridge.liftPyTensor[(Head, Sequence, HeadSpace), BFloat16](
+      Jax.jnp.transpose(PyBridge.toPyTensor(tensor), Seq(1, 0, 2).toPythonCopy)
+    )
 
   /** Whether these parameters can go through the kernel.
     *

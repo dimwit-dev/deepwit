@@ -72,6 +72,21 @@ class FusedAttentionSuite extends AnyFunSpec with Matchers:
       val causal = MultiHeadFusedCausalAttention(Axis[Ctx], Axis[Ctx], p)(x, x)
       (full.asFloat32 - causal.asFloat32).abs.max.item should be > 1e-2f
 
+  describe("the intermediates of a fused attention"):
+
+    it("come from the kernel's own projections, and agree with the head-by-head formulation"):
+      onCuDnn
+      val p = bfloat16Params
+      val x = context.asFloat(VType[BFloat16])
+      val fused = MultiHeadFusedCausalAttention(Axis[Ctx], Axis[Ctx], p)
+      val reference = MultiHeadCustomAttention(p, causalMask[Ctx, Ctx])
+      val (attended, intermediates) = fused.applyWithIntermediates(x, x)
+      val (referenceAttended, referenceIntermediates) = reference.applyWithIntermediates(x, x)
+      attended should approxEqual(referenceAttended, 8e-3f)
+      intermediates.queries should approxEqual(referenceIntermediates.queries, 8e-3f)
+      intermediates.keys should approxEqual(referenceIntermediates.keys, 8e-3f)
+      intermediates.values should approxEqual(referenceIntermediates.values, 8e-3f)
+
   describe("the fused kernel selection"):
 
     it("takes causal and full attention alike when cuDNN accepts the parameters"):

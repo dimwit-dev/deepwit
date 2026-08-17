@@ -34,12 +34,34 @@ abstract class Attention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
   private val projectKey = LinearLayer(params.keyWeights)
   private val projectValue = LinearLayer(params.valueWeights)
 
-  override def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, Value, V] =
+  final def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, Value, V] =
+    applyWithIntermediates(source, target).head
+
+  /** The attended target, together with the projections it was attended from.
+    *
+    * The attention weights are deliberately not among them: they are the one intermediate that
+    * costs a target by source matrix, and the one a fused kernel cannot report at all.
+    */
+  final def applyWithIntermediates(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
+      Tensor2[Target, Value, V],
+      (
+          queries: Tensor2[Target, Query, V],
+          keys: Tensor2[Source, Key, V],
+          values: Tensor2[Source, Value, V]
+      )
+  ) =
     val queries = target.vmap(Axis[Target])(projectQuery)
     val keys = source.vmap(Axis[Source])(projectKey)
     val values = source.vmap(Axis[Source])(projectValue)
     val attentionWeights = calculateAttentionWeights(queries, keys)
-    attentionWeights.dot(Axis[Source])(values)
+    (
+      attentionWeights.dot(Axis[Source])(values),
+      (
+        queries = queries,
+        keys = keys,
+        values = values
+      )
+    )
 
   private def calculateAttentionWeights(queries: Tensor2[Target, Query, V], keys: Tensor2[Source, Key, V]) =
     val attentionScores = attentionScore(queries, keys)

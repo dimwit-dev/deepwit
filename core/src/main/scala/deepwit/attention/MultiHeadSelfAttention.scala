@@ -14,12 +14,14 @@ import dimwit.Label as Λ
   * @tparam V The floating-point scalar type of the tensor elements.
   * @param multiHeadAttention The attention the sequence runs onto itself.
   */
-abstract class MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
+trait MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     multiHeadAttention: MultiHeadAttention[Context, Embedding, Context, Embedding, V]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
-  override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
-    multiHeadAttention(context, context)
+  final def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] = multiHeadAttention(context, context)
+
+  final def applyWithIntermediates(context: Tensor2[Context, Embedding, V]): (Tensor2[Context, Embedding, V], MultiHeadAttention.Intermediates[Context, Context, V]) =
+    multiHeadAttention.applyWithIntermediates(context, context)
 
 /** Multi-head self-attention where every position may attend to every other one.
   *
@@ -28,9 +30,7 @@ abstract class MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating]
 class MultiHeadFullSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     contextAxis: Axis[Context],
     params: MultiHeadSelfAttention.Params[Embedding, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](
-      MultiHeadFullAttention(contextAxis, contextAxis, params.asMultiHeadAttentionParams)
-    )
+) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadFullAttention(contextAxis, contextAxis, params.asMultiHeadAttentionParams))
 
 /** Multi-head self-attention where a position may only attend to positions up to its own index.
   *
@@ -39,9 +39,7 @@ class MultiHeadFullSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
 class MultiHeadCausalSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     contextAxis: Axis[Context],
     params: MultiHeadSelfAttention.Params[Embedding, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](
-      MultiHeadCausalAttention(contextAxis, contextAxis, params.asMultiHeadAttentionParams)
-    )
+) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCausalAttention(contextAxis, contextAxis, params.asMultiHeadAttentionParams))
 
 /** Multi-head self-attention restricted by a caller-supplied mask.
   *
@@ -50,9 +48,7 @@ class MultiHeadCausalSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
 class MultiHeadCustomSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
     mask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
-) extends MultiHeadSelfAttention[Context, Embedding, V](
-      MultiHeadCustomAttention(params.asMultiHeadAttentionParams, mask)
-    )
+) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCustomAttention(params.asMultiHeadAttentionParams, mask))
 
 object MultiHeadSelfAttention:
 

@@ -25,23 +25,48 @@ abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
     params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, TargetEmbedding, V]):
 
-  /** The attention that each head runs on its own query, key and value space. */
   protected def headAttention(
       headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
   ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
 
   private val projectHeadValues = AffineLayer(params.outputProjection)
 
-  override def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, TargetEmbedding, V] =
-    val heads = headValues(source, target)
+  final def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, TargetEmbedding, V] =
+    applyWithIntermediates(source, target).head
+
+  final def applyWithIntermediates(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
+      Tensor2[Target, TargetEmbedding, V],
+      MultiHeadAttention.Intermediates[Source, Target, V]
+  ) =
+    val (heads, intermediates) = headValuesWithIntermediates(source, target)
+    (projectHeads(heads), intermediates)
+
+  protected def headValuesWithIntermediates(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
+      Tensor3[Head, Target, HeadValue, V],
+      MultiHeadAttention.Intermediates[Source, Target, V]
+  ) =
+    val (headValues, queries, keys, values) =
+      zipvmap(Axis[Head])(params.queryWeights, params.keyWeights, params.valueWeights):
+        case (q, k, v) =>
+          val (headValue, perHead) = headAttention(Attention.Params(q, k, v)).applyWithIntermediates(source, target)
+          (headValue, perHead.queries, perHead.keys, perHead.values)
+    (headValues, (queries = queries, keys = keys, values = values))
+
+  private def projectHeads(heads: Tensor3[Head, Target, HeadValue, V]): Tensor2[Target, TargetEmbedding, V] =
     heads.vmap(Axis[Target])(heads => projectHeadValues(heads.flatten))
 
-  protected def headValues(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor3[Head, Target, HeadValue, V] =
-    zipvmap(Axis[Head])(params.queryWeights, params.keyWeights, params.valueWeights):
-      case (q, k, v) =>
-        headAttention(Attention.Params(q, k, v))(source, target)
-
 object MultiHeadAttention:
+
+  /** What every head attended from, stacked over the heads.
+    *
+    * The attention weights are deliberately not among them: they are the one intermediate that
+    * costs a target by source matrix per head, and the one a fused kernel cannot report at all.
+    */
+  type Intermediates[Source, Target, V] = (
+      queries: Tensor3[Head, Target, HeadQuery, V],
+      keys: Tensor3[Head, Source, HeadKey, V],
+      values: Tensor3[Head, Source, HeadValue, V]
+  )
 
   case class Params[SourceEmbedding, TargetEmbedding, V](
       queryWeights: Tensor3[Head, TargetEmbedding, HeadQuery, V],
@@ -65,7 +90,6 @@ object MultiHeadAttention:
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
       val headExtent = Axis[Head] -> numHeads
       val headQueryExtent = Axis[HeadQuery] -> targetEmbeddingExtent.size / numHeads
-      // The scaled dot-product contracts the query space against the key space, so the key extent follows the query extent.
       val headKeyExtent = Axis[HeadKey] -> targetEmbeddingExtent.size / numHeads
       val headValueExtent = Axis[HeadValue] -> sourceEmbeddingExtent.size / numHeads
       Params(

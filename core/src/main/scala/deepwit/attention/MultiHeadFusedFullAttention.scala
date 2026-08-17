@@ -22,8 +22,8 @@ class MultiHeadFusedFullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
     params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]
 ) extends MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, BFloat16](sourceAxis, targetAxis, params):
 
-  override protected def headValues(
+  override protected def headValuesWithIntermediates(
       source: Tensor2[Source, SourceEmbedding, BFloat16],
       target: Tensor2[Target, TargetEmbedding, BFloat16]
-  ): Tensor3[Head, Target, HeadValue, BFloat16] =
-    FusedAttention.headValues(params, source, target, isCausal = false)
+  ): (Tensor3[Head, Target, HeadValue, BFloat16], MultiHeadAttention.Intermediates[Source, Target, BFloat16]) =
+    FusedAttention.headValuesWithIntermediates(params, source, target, isCausal = false)

@@ -72,6 +72,24 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
       )
       (full(varyingSource, target) - causal(varyingSource, target)).abs.max.item should be > 1e-3f
 
+  describe("MultiHeadAttention.applyWithIntermediates"):
+
+    it("attends as apply does, and reports what every head worked with"):
+      val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], params())
+      val (attended, intermediates) = attention.applyWithIntermediates(source(), target)
+      attended should approxEqual(attention(source(), target), 1e-6f)
+      intermediates.queries.shape(Axis[Head]) shouldBe numHeads
+      intermediates.queries.shape(Axis[Tgt]) shouldBe 3
+      intermediates.keys.shape(Axis[Src]) shouldBe 3
+      intermediates.values.shape(Axis[HeadValue]) shouldBe 2
+
+    it("reports the projections each head drew from, not the attention weights"):
+      val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], params())
+      val (_, intermediates) = attention.applyWithIntermediates(source(), target)
+      // The queries are the target read through each head's own query weights.
+      val firstHeadQueries = target.dot(Axis[TgtEmb])(params().queryWeights.slice(Axis[Head].at(0)))
+      intermediates.queries.slice(Axis[Head].at(0)) should approxEqual(firstHeadQueries, 1e-5f)
+
   describe("MultiHeadAttention.Params.xavierUniformDepthScaled"):
 
     it("splits both embedding spaces across the heads"):
