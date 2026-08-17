@@ -1,5 +1,9 @@
 package deepwit.training
 
+import dimwit.*
+
+import deepwit.optimizer.LearningRateSchedule
+
 /** Renders a one-line report about the training state at a given step. */
 trait Monitor[S]:
   def report(step: Int, state: S): String
@@ -25,7 +29,18 @@ object Monitor:
     def report(step: Int, state: S): String =
       f"Loss: ${lossLens(state)}%.4f"
 
-  case class PerformanceMonitor[S](batchSize: Int) extends Monitor[S]:
+  /** Reports the learning rate the schedule prescribes for the step. */
+  case class LearningRateMonitor[S](schedule: LearningRateSchedule) extends Monitor[S]:
+    def report(step: Int, state: S): String =
+      f"LR: ${schedule(Tensor0(step)).item}%.2e"
+
+  /** Reports how many units of work per second the run sustains, given how many of them a step processes.
+    *
+    * The unit is whatever a run measures its progress in — samples, tokens, frames, ... — and is named
+    * in the report as `<unitName>/sec`. Not a case class: it carries the timing of the previous report,
+    * so that it can be specialised to a unit by extending it.
+    */
+  class ThroughputMonitor[S](unitsPerStep: Int, unitName: String) extends Monitor[S]:
     private var lastTime = System.nanoTime()
     private var lastStep = 0
 
@@ -35,6 +50,9 @@ object Monitor:
       lastStep = step
       val currentTime = System.nanoTime()
       val elapsedS = (currentTime - lastTime) / 1e9d
-      val sPerSec = (batchSize * elapsedSteps) / elapsedS
+      val unitsPerSec = (unitsPerStep.toDouble * elapsedSteps) / elapsedS
       lastTime = currentTime
-      f"$sPerSec%.2f samples/sec"
+      f"$unitsPerSec%.2f $unitName/sec"
+
+  /** Reports sample throughput, the [[ThroughputMonitor]] every training loop wants. */
+  class PerformanceMonitor[S](batchSize: Int) extends ThroughputMonitor[S](batchSize, "samples")

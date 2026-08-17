@@ -5,12 +5,11 @@ import deepwit.loss.CategoricalCrossEntropy
 
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.training.tapEvery
+import deepwit.training.{Monitor, tapEvery}
 import deepwit.optimizer.*
 import dimwit.optimizer.{AdamW, Adam, AdamState}
 import dimwit.TreeOf.ops.*
 
-import java.io.{FileWriter, PrintWriter, File}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import FineWebDataset.{BatchSample, batchStream}
@@ -20,6 +19,7 @@ import me.shadaj.scalapy.py
 
 import deepwit.optimizer.LearningRateSchedule
 import deepwit.optimizer.LearningRateSchedules.LinearWarmup
+import deepwit.training.Monitor.PerformanceMonitor
 
 object Config:
   val runningBatchSize = 64 // 12
@@ -158,38 +158,24 @@ import Config.*
 
   val trainTrajectory = miniBatchGradientDescent(trainStream, initState)
 
-  // Initialize CSV File
   val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
   val logger = TensorTreeCheckpointer(f"out/GPT-2/$time")
 
-  val csvFile = new File(s"training_log_$time.csv")
-  val writer = new PrintWriter(new FileWriter(csvFile, true), true)
+  val trainMonitor = Monitor.ConcatMonitor[TrainingState](List(
+    Monitor.StepMonitor(),
+    Monitor.LossMonitor(state => state.stepCost.item),
+    Monitor.PerformanceMonitor(effectiveBatchSize),
+    Monitor.ThroughputMonitor(effectiveBatchSize * contextExtent.size, unitName = "tokens"),
+    Monitor.LearningRateMonitor(schedule)
+  ))
 
-  val headers = List("timestamp", "step", "tokens_per_s", "samples_per_s", "s_per_batch", "learning_rate", "step_cost")
-  writer.println(headers.mkString(","))
-
-  val timer = Timer.start()
   println("Training...")
 
   val finalState = trainTrajectory
     .drop(1)
     .tapEvery(1):
       case (state, _) =>
-        val step = state.optState.step.item
-        // Training report
-        timer.tick()
-        val secondsPerBatch = timer.runningAvgSeconds
-        val logData = Map(
-          "timestamp" -> java.time.Instant.now().toString,
-          "step" -> step,
-          "tokens_per_s" -> f"${(effectiveBatchSize * contextExtent.size) / (secondsPerBatch)}%.2f",
-          "samples_per_s" -> f"${effectiveBatchSize / (secondsPerBatch)}%.2f",
-          "s_per_batch" -> f"$secondsPerBatch%.2f",
-          "learning_rate" -> f"${schedule(step)}",
-          "step_cost" -> f"${state.stepCost.item}%.2f"
-        )
-        writer.println(headers.map(h => logData(h)).mkString(","))
-        println(headers.map(h => s"$h: ${logData(h)}").mkString(" | "))
+        println(trainMonitor.report(state.optState.step.item, state))
     .tapEvery(1_000):
       case (state, _) =>
         val step = state.optState.step.item
