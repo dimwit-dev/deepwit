@@ -1,0 +1,12 @@
+Finished tracing python_wrapper for jit in 0.234704494 sec
+Finished jaxpr to MLIR module conversion jit(python_wrapper) in 0.056624651 sec
+Finished XLA compilation of jit(python_wrapper) in 180.887965441 sec
+
+
+Finished tracing python_wrapper for jit in 0.232075214 sec
+Finished jaxpr to MLIR module conversion jit(python_wrapper) in 0.053953648 sec
+Finished XLA compilation of jit(python_wrapper) in 181.510761261 seconds_per_batch
+
+
+Finished tracing python_wrapper for jit in 0.235107422 sec
+Finished jaxpr to MLIR module conversion jit(python_wrapper) in 0.058633327 sec

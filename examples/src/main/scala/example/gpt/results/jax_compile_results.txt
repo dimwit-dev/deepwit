@@ -1,0 +1,13 @@
+Finished tracing _microbatch_gradients for jit in 0.117539644 sec
+Finished jaxpr to MLIR module conversion jit(_microbatch_gradients) in 0.048212290 sec
+Finished XLA compilation of jit(_microbatch_gradients) in 189.397733212 sec
+
+
+Finished tracing _microbatch_gradients for jit in 0.118808031 sec
+Finished jaxpr to MLIR module conversion jit(_microbatch_gradients) in 0.047994137 sec
+Finished XLA compilation of jit(_microbatch_gradients) in 187.364021540 sec
+
+
+Finished tracing _microbatch_gradients for jit in 0.120987654 sec
+Finished jaxpr to MLIR module conversion jit(_microbatch_gradients) in 0.052750826 sec
+Finished XLA compilation of jit(_microbatch_gradients) in 188.980123997 sec
