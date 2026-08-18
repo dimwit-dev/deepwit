@@ -14,7 +14,7 @@ import dimwit.Label as Λ
   * @tparam V The floating-point scalar type of the tensor elements.
   * @param multiHeadAttention The attention the sequence runs onto itself.
   */
-trait MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
+abstract class MultiHeadSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     multiHeadAttention: MultiHeadAttention[Context, Embedding, Context, Embedding, V]
 ) extends (Tensor2[Context, Embedding, V] => Tensor2[Context, Embedding, V]):
 
@@ -47,8 +47,9 @@ class MultiHeadCausalSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
   */
 class MultiHeadCustomSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
-    mask: Shape2[Context, Context] => Tensor2[Context, Context, Bool]
-) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCustomAttention(params.asMultiHeadAttentionParams, mask))
+    mask: Shape2[Context, Context] => Tensor2[Context, Context, Bool],
+    attentionScore: AttentionScore[Context, Context, HeadQuery, HeadKey, V]
+) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCustomAttention(params.asMultiHeadAttentionParams, mask, attentionScore))
 
 object MultiHeadSelfAttention:
 

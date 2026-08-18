@@ -15,12 +15,7 @@ import dimwit.Label as Λ
 @FunctionalInterface
 trait AttentionScore[Target, Source, Query, Key, V] extends ((Tensor2[Target, Query, V], Tensor2[Source, Key, V]) => Tensor2[Target, Source, V])
 
-/** Scores a query against a key by their dot product, scaled down by the square root of the key extent.
-  *
-  * The scaling keeps the scores in a range where the softmax does not saturate as the key space grows.
-  */
-class ScaledDotProduct[Target: Λ, Source: Λ, Query: Λ, Key: Λ, V: IsFloating] extends AttentionScore[Target, Source, Query, Key, V]:
-
-  override def apply(queries: Tensor2[Target, Query, V], keys: Tensor2[Source, Key, V]): Tensor2[Target, Source, V] =
+object AttentionScore:
+  def scaledDotProduct[Target: Λ, Source: Λ, Query: Λ, Key: Λ, V: IsFloating](queries: Tensor2[Target, Query, V], keys: Tensor2[Source, Key, V]): Tensor2[Target, Source, V] =
     val dk = Math.sqrt(keys.shape(Axis[Key]))
     queries.dot(Axis[Query] -> Axis[Key])(keys) /! dk

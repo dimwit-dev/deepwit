@@ -46,7 +46,7 @@ class AttentionSuite extends AnyFunSpec with Matchers:
       wv = identity2(Axis[SrcEmb], Axis[Vl])
     )
 
-  describe("ScaledDotProduct"):
+  describe("AttentionScore.scaledDotProduct"):
 
     it("scales the dot products by the square root of the key dimension"):
       // format: off
@@ -63,24 +63,25 @@ class AttentionSuite extends AnyFunSpec with Matchers:
         0f, 1f
       )) /! math.sqrt(2.0)
       // format: on
-      ScaledDotProduct[Tgt, Src, Qry, Ky, Float32]()(queries, keys) should approxEqual(expected, 1e-6f)
+      val res = AttentionScore.scaledDotProduct(queries, keys)
+      res should approxEqual(expected, 1e-6f)
 
   describe("Attention"):
 
     it("returns one value vector per target position"):
-      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])))
+      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), AttentionScore.scaledDotProduct)
       val result = attention(source, target)
       result.shape(Axis[Tgt]) shouldBe 2
       result.shape(Axis[Vl]) shouldBe 2
 
     it("averages the values when every key is identical"):
       // Zero key weights make all scores equal, so softmax spreads the attention uniformly.
-      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])))
+      val attention = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])), AttentionScore.scaledDotProduct)
       val meanOfValues = Tensor(Shape(tgtExtent, Axis[Vl] -> 2)).fromArray(Array(2f, 3f, 2f, 3f))
       attention(source, target) should approxEqual(meanOfValues, 1e-5f)
 
     it("gives the first target position only the first source value under a causal mask"):
-      val attention = CausalAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])))
+      val attention = CausalAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), AttentionScore.scaledDotProduct)
       val firstRow = attention(source, target).slice(Axis[Tgt].at(0))
       firstRow should approxEqual(Tensor(Shape1(Axis[Vl] -> 2)).fromArray(Array(1f, 2f)), 1e-5f)
 
@@ -94,8 +95,8 @@ class AttentionSuite extends AnyFunSpec with Matchers:
       attention(source, target) should approxEqual(meanOfValues, 1e-5f)
 
     it("differs from the uniform result under the default scores"):
-      val default = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])))
-      val uniform = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])))
+      val default = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), AttentionScore.scaledDotProduct)
+      val uniform = FullAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(zeros2(Axis[SrcEmb], Axis[Ky])), AttentionScore.scaledDotProduct)
       (default(source, target) - uniform(source, target)).abs.max.item should be > 1e-3f
 
   describe("Attention.Params.init"):

@@ -4,30 +4,11 @@ import dimwit.*
 import deepwit.base.AffineLayer
 import deepwit.init
 import dimwit.Label as Λ
+import deepwit.attention.AttentionScore.scaledDotProduct
 
-/** Represents multi-head attention from a target sequence of embeddings onto a source sequence of embeddings.
-  *
-  * Every head runs an independent [[Attention]] on its own query, key and value space. The
-  * concatenated head values are projected back into the target embedding space. Which source
-  * positions a target position may attend to is left to the implementation:
-  * [[MultiHeadFullAttention]], [[MultiHeadCausalAttention]] or [[MultiHeadCustomAttention]].
-  *
-  * Overriding [[headAttention]] is also how the heads get a different [[AttentionScore]].
-  *
-  * @tparam Source The axis label for the source sequence.
-  * @tparam SourceEmbedding The axis label for the source embedding space.
-  * @tparam Target The axis label for the target sequence.
-  * @tparam TargetEmbedding The axis label for the target embedding space.
-  * @tparam V The floating-point scalar type of the tensor elements.
-  * @param params The learnable parameters.
-  */
 abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
-    params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
+    val params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, TargetEmbedding, V]):
-
-  protected def headAttention(
-      headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
-  ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
 
   private val projectHeadValues = AffineLayer(params.outputProjection)
 
@@ -38,34 +19,21 @@ abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
       Tensor2[Target, TargetEmbedding, V],
       MultiHeadAttention.Intermediates[Source, Target, V]
   ) =
-    val (heads, intermediates) = headValuesWithIntermediates(source, target)
-    (projectHeads(heads), intermediates)
+    val (heads, intermediates) = attend(source, target)
+    val res = heads.vmap(Axis[Target])(heads => projectHeadValues(heads.flatten))
+    (res, intermediates)
 
-  protected def headValuesWithIntermediates(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
-      Tensor3[Head, Target, HeadValue, V],
+  protected def attend(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
+      Tensor3[Target, Head, HeadValue, V],
       MultiHeadAttention.Intermediates[Source, Target, V]
-  ) =
-    val (headValues, queries, keys, values) =
-      zipvmap(Axis[Head])(params.queryWeights, params.keyWeights, params.valueWeights):
-        case (q, k, v) =>
-          val (headValue, perHead) = headAttention(Attention.Params(q, k, v)).applyWithIntermediates(source, target)
-          (headValue, perHead.queries, perHead.keys, perHead.values)
-    (headValues, (queries = queries, keys = keys, values = values))
-
-  private def projectHeads(heads: Tensor3[Head, Target, HeadValue, V]): Tensor2[Target, TargetEmbedding, V] =
-    heads.vmap(Axis[Target])(heads => projectHeadValues(heads.flatten))
+  )
 
 object MultiHeadAttention:
 
-  /** What every head attended from, stacked over the heads.
-    *
-    * The attention weights are deliberately not among them: they are the one intermediate that
-    * costs a target by source matrix per head, and the one a fused kernel cannot report at all.
-    */
   type Intermediates[Source, Target, V] = (
-      queries: Tensor3[Head, Target, HeadQuery, V],
-      keys: Tensor3[Head, Source, HeadKey, V],
-      values: Tensor3[Head, Source, HeadValue, V]
+      queries: Tensor3[Target, Head, HeadQuery, V],
+      keys: Tensor3[Source, Head, HeadKey, V],
+      values: Tensor3[Source, Head, HeadValue, V]
   )
 
   case class Params[SourceEmbedding, TargetEmbedding, V](
@@ -99,80 +67,42 @@ object MultiHeadAttention:
         outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, targetEmbeddingExtent, vtype, projectionKey)
       )
 
-/** Multi-head attention where every target position may attend to every source position.
-  *
-  * @param sourceAxis The axis of the source sequence. Names the label the source is attended over.
-  * @param targetAxis The axis of the target sequence. Names the label the queries are drawn from.
-  */
-class MultiHeadFullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
+abstract class MultiHeadFullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     sourceAxis: Axis[Source],
     targetAxis: Axis[Target],
     params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
-) extends MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, V](params):
-
-  override protected def headAttention(
-      headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
-  ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V] =
-    FullAttention(sourceAxis, targetAxis, headParams)
+) extends MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, V](params)
 
 object MultiHeadFullAttention:
 
-  /** Runs on [[MultiHeadFusedFullAttention]] wherever cuDNN accepts the parameters and the hardware,
-    * and on the head-by-head formulation everywhere else.
-    */
+  /** Smart constructor that routes to fused or unfused attention depending on the parameters and hardware. */
   def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
       sourceAxis: Axis[Source],
       targetAxis: Axis[Target],
       params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
   ): MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V] =
-    if FusedAttention.canRun(params) then
+    if FusedAttentionKernel.canRun(VType[V].dtype) then
       // Guarded by the check above: it only passes when V is BFloat16.
       MultiHeadFusedFullAttention(sourceAxis, targetAxis, params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]])
         .asInstanceOf[MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
-    else new MultiHeadFullAttention(sourceAxis, targetAxis, params)
+    else MultiHeadUnfusedFullAttention(sourceAxis, targetAxis, params, AttentionScore.scaledDotProduct)
 
-/** Multi-head attention where a target position may only attend to source positions up to its own index.
-  *
-  * @param sourceAxis The axis of the source sequence. Names the label the source is attended over.
-  * @param targetAxis The axis of the target sequence. Names the label the queries are drawn from.
-  */
-class MultiHeadCausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
+abstract class MultiHeadCausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     sourceAxis: Axis[Source],
     targetAxis: Axis[Target],
     params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
-) extends MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, V](params):
-
-  override protected def headAttention(
-      headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
-  ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V] =
-    CausalAttention(sourceAxis, targetAxis, headParams)
+) extends MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, V](params)
 
 object MultiHeadCausalAttention:
 
-  /** Runs on [[MultiHeadFusedCausalAttention]] wherever cuDNN accepts the parameters and the
-    * hardware, and on the head-by-head formulation everywhere else.
-    */
+  /** Smart constructor that routes to fused or unfused attention depending on the parameters and hardware. */
   def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
       sourceAxis: Axis[Source],
       targetAxis: Axis[Target],
       params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
   ): MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V] =
-    if FusedAttention.canRun(params) then
+    if FusedAttentionKernel.canRun(VType[V].dtype) then
       // Guarded by the check above: it only passes when V is BFloat16.
       MultiHeadFusedCausalAttention(sourceAxis, targetAxis, params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]])
         .asInstanceOf[MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
-    else new MultiHeadCausalAttention(sourceAxis, targetAxis, params)
-
-/** Multi-head attention restricted by a caller-supplied mask.
-  *
-  * @param mask A function generating a boolean mask to prevent attention to certain positions.
-  */
-class MultiHeadCustomAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
-    params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V],
-    mask: Shape2[Target, Source] => Tensor2[Target, Source, Bool]
-) extends MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, V](params):
-
-  override protected def headAttention(
-      headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]
-  ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V] =
-    CustomAttention(headParams, mask)
+    else MultiHeadUnfusedCausalAttention(sourceAxis, targetAxis, params, AttentionScore.scaledDotProduct)

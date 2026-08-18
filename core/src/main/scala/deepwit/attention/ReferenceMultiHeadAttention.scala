@@ -10,10 +10,11 @@ import dimwit.Label as Λ
 
 class ReferenceMultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     params: ReferenceMultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V],
-    createAttentionMask: Shape2[Target, Source] => Tensor2[Target, Source, Bool]
+    createAttentionMask: Shape2[Target, Source] => Tensor2[Target, Source, Bool],
+    attentionScore: AttentionScore[Target, Source, HeadQuery, HeadKey, V]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, TargetEmbedding, V]):
 
-  private val heads = params.heads.map(headParams => CustomAttention(headParams, createAttentionMask))
+  private val heads = params.heads.map(headParams => CustomAttention(headParams, createAttentionMask, attentionScore))
   private val projectHeadValues = AffineLayer(params.outputProjection)
 
   override def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, TargetEmbedding, V] =

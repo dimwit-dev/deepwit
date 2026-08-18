@@ -42,7 +42,7 @@ class FusedAttentionSuite extends AnyFunSpec with Matchers:
 
   private def context = Normal.standardNormal(Shape(ctxExtent, embExtent)).sample(Random.Key(7))
 
-  private def onCuDnn = assume(FusedAttention.isAvailable(DType.BFloat16), "needs cuDNN on a CUDA device")
+  private def onCuDnn = assume(FusedAttentionKernel.canRun(DType.BFloat16), "needs cuDNN on a CUDA device")
 
   describe("MultiHeadFusedCausalAttention"):
 
@@ -51,7 +51,7 @@ class FusedAttentionSuite extends AnyFunSpec with Matchers:
       val p = bfloat16Params
       val x = context.asFloat(VType[BFloat16])
       val fused = MultiHeadFusedCausalAttention(Axis[Ctx], Axis[Ctx], p)
-      val reference = MultiHeadCustomAttention(p, causalMask[Ctx, Ctx])
+      val reference = MultiHeadCustomAttention(p, causalMask[Ctx, Ctx], AttentionScore.scaledDotProduct)
       fused(x, x) should approxEqual(reference(x, x), 8e-3f)
 
   describe("MultiHeadFusedFullAttention"):
@@ -61,7 +61,7 @@ class FusedAttentionSuite extends AnyFunSpec with Matchers:
       val p = bfloat16Params
       val x = context.asFloat(VType[BFloat16])
       val fused = MultiHeadFusedFullAttention(Axis[Ctx], Axis[Ctx], p)
-      val reference = MultiHeadCustomAttention(p, fullMask[Ctx, Ctx])
+      val reference = MultiHeadCustomAttention(p, fullMask[Ctx, Ctx], AttentionScore.scaledDotProduct)
       fused(x, x) should approxEqual(reference(x, x), 8e-3f)
 
     it("attends beyond the diagonal, unlike the causal kernel"):
@@ -79,7 +79,7 @@ class FusedAttentionSuite extends AnyFunSpec with Matchers:
       val p = bfloat16Params
       val x = context.asFloat(VType[BFloat16])
       val fused = MultiHeadFusedCausalAttention(Axis[Ctx], Axis[Ctx], p)
-      val reference = MultiHeadCustomAttention(p, causalMask[Ctx, Ctx])
+      val reference = MultiHeadCustomAttention(p, causalMask[Ctx, Ctx], AttentionScore.scaledDotProduct)
       val (attended, intermediates) = fused.applyWithIntermediates(x, x)
       val (referenceAttended, referenceIntermediates) = reference.applyWithIntermediates(x, x)
       attended should approxEqual(referenceAttended, 8e-3f)

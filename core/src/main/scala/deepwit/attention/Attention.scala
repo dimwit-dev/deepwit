@@ -27,7 +27,6 @@ abstract class Attention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
     attentionScore: AttentionScore[Target, Source, Query, Key, V]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, Value, V]):
 
-  /** The source positions that each target position may attend to. */
   protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool]
 
   private val projectQuery = LinearLayer(params.queryWeights)
@@ -37,30 +36,14 @@ abstract class Attention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
   final def apply(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): Tensor2[Target, Value, V] =
     applyWithIntermediates(source, target).head
 
-  /** The attended target, together with the projections it was attended from.
-    *
-    * The attention weights are deliberately not among them: they are the one intermediate that
-    * costs a target by source matrix, and the one a fused kernel cannot report at all.
-    */
-  final def applyWithIntermediates(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
-      Tensor2[Target, Value, V],
-      (
-          queries: Tensor2[Target, Query, V],
-          keys: Tensor2[Source, Key, V],
-          values: Tensor2[Source, Value, V]
-      )
-  ) =
+  final def applyWithIntermediates(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (Tensor2[Target, Value, V], Attention.Intermediates[Source, Target, Query, Key, Value, V]) =
     val queries = target.vmap(Axis[Target])(projectQuery)
     val keys = source.vmap(Axis[Source])(projectKey)
     val values = source.vmap(Axis[Source])(projectValue)
     val attentionWeights = calculateAttentionWeights(queries, keys)
     (
       attentionWeights.dot(Axis[Source])(values),
-      (
-        queries = queries,
-        keys = keys,
-        values = values
-      )
+      (queries = queries, keys = keys, values = values)
     )
 
   private def calculateAttentionWeights(queries: Tensor2[Target, Query, V], keys: Tensor2[Source, Key, V]) =
@@ -70,6 +53,12 @@ abstract class Attention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
     maskedScores.vapply(Axis[Source])(softmax)
 
 object Attention:
+
+  type Intermediates[Source, Target, Query, Key, Value, V] = (
+      queries: Tensor2[Target, Query, V],
+      keys: Tensor2[Source, Key, V],
+      values: Tensor2[Source, Value, V]
+  )
 
   case class Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V](
       queryWeights: LinearLayer.Params[TargetEmbedding, Query, V],
@@ -105,24 +94,6 @@ class FullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding
 
   override protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool] = fullMask(scoreShape)
 
-object FullAttention:
-
-  /** Defaults the attention scores to [[ScaledDotProduct]]. */
-  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
-      sourceAxis: Axis[Source],
-      targetAxis: Axis[Target],
-      params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V]
-  ): FullAttention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V] =
-    new FullAttention(sourceAxis, targetAxis, params, ScaledDotProduct())
-
-  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
-      sourceAxis: Axis[Source],
-      targetAxis: Axis[Target],
-      params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V],
-      attentionScore: AttentionScore[Target, Source, Query, Key, V]
-  ): FullAttention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V] =
-    new FullAttention(sourceAxis, targetAxis, params, attentionScore)
-
 /** Attention where a target position may only attend to source positions up to its own index.
   *
   * @param sourceAxis The axis of the source sequence. Names the label the source is attended over.
@@ -137,24 +108,6 @@ class CausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbeddi
 
   override protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool] = causalMask(scoreShape)
 
-object CausalAttention:
-
-  /** Defaults the attention scores to [[ScaledDotProduct]]. */
-  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
-      sourceAxis: Axis[Source],
-      targetAxis: Axis[Target],
-      params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V]
-  ): CausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V] =
-    new CausalAttention(sourceAxis, targetAxis, params, ScaledDotProduct())
-
-  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
-      sourceAxis: Axis[Source],
-      targetAxis: Axis[Target],
-      params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V],
-      attentionScore: AttentionScore[Target, Source, Query, Key, V]
-  ): CausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V] =
-    new CausalAttention(sourceAxis, targetAxis, params, attentionScore)
-
 /** Attention restricted by a caller-supplied mask.
   *
   * @param mask A function generating a boolean mask to prevent attention to certain positions.
@@ -167,18 +120,12 @@ class CustomAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbeddi
 
   override protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool] = mask(scoreShape)
 
-object CustomAttention:
+private def causalMask[Context: Λ, CrossContext: Λ](
+    scoreShape: Shape2[Context, CrossContext]
+): Tensor[(Context, CrossContext), Bool] =
+  tril(fullMask(scoreShape))
 
-  /** Defaults the attention scores to [[ScaledDotProduct]]. */
-  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
-      params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V],
-      mask: Shape2[Target, Source] => Tensor2[Target, Source, Bool]
-  ): CustomAttention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V] =
-    new CustomAttention(params, mask, ScaledDotProduct())
-
-  def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
-      params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V],
-      mask: Shape2[Target, Source] => Tensor2[Target, Source, Bool],
-      attentionScore: AttentionScore[Target, Source, Query, Key, V]
-  ): CustomAttention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V] =
-    new CustomAttention(params, mask, attentionScore)
+private def fullMask[Context: Λ, CrossContext: Λ](
+    scoreShape: Shape2[Context, CrossContext]
+): Tensor[(Context, CrossContext), Bool] =
+  Tensor(scoreShape).fill(true)
