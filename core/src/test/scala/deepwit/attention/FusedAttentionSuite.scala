@@ -42,7 +42,7 @@ class FusedAttentionSuite extends AnyFunSpec with Matchers:
 
   private def context = Normal.standardNormal(Shape(ctxExtent, embExtent)).sample(Random.Key(7))
 
-  private def onCuDnn = assume(FusedAttentionKernel.canRun(DType.BFloat16), "needs cuDNN on a CUDA device")
+  private def onCuDnn = assume(FusedMultiHeadAttentionKernel.canRun(DType.BFloat16), "needs cuDNN on a CUDA device")
 
   describe("MultiHeadFusedCausalAttention"):
 

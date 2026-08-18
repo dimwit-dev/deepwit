@@ -6,6 +6,10 @@ import deepwit.init
 import dimwit.Label as Λ
 import deepwit.attention.AttentionScore.scaledDotProduct
 
+/** Represents a multi-head attention mechanism from a target sequence of embeddings onto a source sequence of embeddings and projecting the result back to the target embedding space.
+  *
+  * $\text{MultiHeadAttention}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)W^O$ where $\text{head}_i = \text{Attention}(QW_i^Q, KW_i^K, VW_i^V)$ (see [[Attention]] for the definition of $\text{Attention}$).
+  */
 abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     val params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, TargetEmbedding, V]):
@@ -30,12 +34,14 @@ abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
 
 object MultiHeadAttention:
 
+  /** Holds the intermediate tensors computed during multi-head attention. */
   type Intermediates[Source, Target, V] = (
       queries: Tensor3[Target, Head, HeadQuery, V],
       keys: Tensor3[Source, Head, HeadKey, V],
       values: Tensor3[Source, Head, HeadValue, V]
   )
 
+  /** Holds the parameters for the multi-head attention mechanism. */
   case class Params[SourceEmbedding, TargetEmbedding, V](
       queryWeights: Tensor3[Head, TargetEmbedding, HeadQuery, V],
       keyWeights: Tensor3[Head, SourceEmbedding, HeadKey, V],
@@ -67,6 +73,7 @@ object MultiHeadAttention:
         outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, targetEmbeddingExtent, vtype, projectionKey)
       )
 
+/** Multi-head attention where every target position may attend to every source position. */
 abstract class MultiHeadFullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     sourceAxis: Axis[Source],
     targetAxis: Axis[Target],
@@ -75,18 +82,19 @@ abstract class MultiHeadFullAttention[Source: Λ, SourceEmbedding: Λ, Target: �
 
 object MultiHeadFullAttention:
 
-  /** Smart constructor that routes to fused or unfused attention depending on the parameters and hardware. */
+  /** Smart constructor that routes to fused or unfused attention depending on the parameters and hardware for best out-the-box efficiency. */
   def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
       sourceAxis: Axis[Source],
       targetAxis: Axis[Target],
       params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
   ): MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V] =
-    if FusedAttentionKernel.canRun(VType[V].dtype) then
-      // Guarded by the check above: it only passes when V is BFloat16.
-      MultiHeadFusedFullAttention(sourceAxis, targetAxis, params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]])
-        .asInstanceOf[MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
+    if MultiHeadFusedFullAttention.isAvailable(VType[V].dtype) then
+      val paramsBFloat16 = params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]] // Guarded by the check above
+      val res = MultiHeadFusedFullAttention(sourceAxis, targetAxis, paramsBFloat16)
+      res.asInstanceOf[MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
     else MultiHeadUnfusedFullAttention(sourceAxis, targetAxis, params, AttentionScore.scaledDotProduct)
 
+/** Multi-head attention where a target position may only attend to source positions up to its own index. */
 abstract class MultiHeadCausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     sourceAxis: Axis[Source],
     targetAxis: Axis[Target],
@@ -95,14 +103,14 @@ abstract class MultiHeadCausalAttention[Source: Λ, SourceEmbedding: Λ, Target:
 
 object MultiHeadCausalAttention:
 
-  /** Smart constructor that routes to fused or unfused attention depending on the parameters and hardware. */
+  /** Smart constructor that routes to fused or unfused attention depending on the parameters and hardware for best out-the-box efficiency. */
   def apply[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
       sourceAxis: Axis[Source],
       targetAxis: Axis[Target],
       params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V]
   ): MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V] =
-    if FusedAttentionKernel.canRun(VType[V].dtype) then
-      // Guarded by the check above: it only passes when V is BFloat16.
-      MultiHeadFusedCausalAttention(sourceAxis, targetAxis, params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]])
-        .asInstanceOf[MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
+    if MultiHeadFusedCausalAttention.isAvailable(VType[V].dtype) then
+      val paramsBFloat16 = params.asInstanceOf[MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16]] // Guarded by the check above
+      val res = MultiHeadFusedCausalAttention(sourceAxis, targetAxis, paramsBFloat16)
+      res.asInstanceOf[MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, V]]
     else MultiHeadUnfusedCausalAttention(sourceAxis, targetAxis, params, AttentionScore.scaledDotProduct)
