@@ -72,7 +72,7 @@ private[attention] object FusedMultiHeadAttentionKernel:
     val values = source.dot(Axis[SourceEmbedding])(params.valueWeights)
 
     val res = PyBridge.liftPyTensor[(Target, Head, HeadValue), BFloat16]:
-      Jax.jax.nn.dot_product_attention(
+      Jax.jnn.dot_product_attention(
         PyBridge.toPyTensor(queries),
         PyBridge.toPyTensor(keys),
         PyBridge.toPyTensor(values),

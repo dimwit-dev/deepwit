@@ -14,7 +14,12 @@ import deepwit.regularization.Dropout
 
 private trait Batch derives Label
 
-case class TrainState(params: MNistCNN.Params, optimizerState: GradientDescentState[MNistCNN.Params], lastCost: Tensor0[Float32])
+case class TrainState(
+    params: MNistCNN.Params,
+    optimizerState: GradientDescentState[MNistCNN.Params],
+    trainKey: Key,
+    lastCost: Tensor0[Float32]
+)
 
 @main
 def mnistCNNTrain(): Unit =
@@ -25,12 +30,6 @@ def mnistCNNTrain(): Unit =
   val dropoutProbability = 0.2f
 
   val (paramsKey, dropoutSeed) = Random.Key(42).split2()
-
-  /** One key per step, which is the only place randomness enters the training. */
-  def dropoutKeys(seed: Key): Iterator[Key] =
-    Iterator.unfold(seed): key =>
-      val (nextKey, stepKey) = key.split2()
-      Some((stepKey, nextKey))
 
   val trainDataset = MNISTLoader.createTrainingDataset().get
   val testDataset = MNISTLoader.createTestDataset().get
@@ -46,27 +45,24 @@ def mnistCNNTrain(): Unit =
 
   val optimizer = GradientDescent(learningRate = learningRate)
 
-  // The thinned projection comes in on its own rather than inside a thinned copy of the parameters:
-  // such a copy would share its buffers with the donated state, which jit refuses.
   def gradientStep(
       batch: MNISTBatchSample[Batch],
-      thinnedDropout: Dropout.Params[ImageEmbedding, Float32],
       state: TrainState
   ): TrainState =
-    val thinnedParams = state.params.copy(imageEmbeddingDropout = thinnedDropout)
-    val (cost, grads) = Autodiff.valueAndGrad(costFnFor(batch.images, batch.labels))(thinnedParams)
-    val (newParams, newOptimizerState) = optimizer.update(grads, state.params, state.optimizerState)
-    // The projection is not learned, so the stored one carries over untouched.
-    TrainState(newParams.copy(imageEmbeddingDropout = state.params.imageEmbeddingDropout), newOptimizerState, cost)
+    val (nextKey, dropoutKey) = state.trainKey.split2()
+    val thinnedParams = state.params.thinned(dropoutProbability, dropoutKey)
+    val (cost, grads) = Autodiff.valueAndGrad(costFnFor(batch.images, batch.labels))(thinnedParams) // use thinned parameters for the gradient computation
+    val (newParams, newOptimizerState) = optimizer.update(grads, state.params, state.optimizerState) // update the full parameters
+    TrainState(newParams, newOptimizerState, nextKey, cost)
   val jitGradientStep = jitDonatingUnsafe(gradientStep)
 
   val initialParams = MNistCNN.Params(paramsKey)(16, 32)
   val initialOptimizerState = optimizer.init(initialParams)
 
-  val trainTrajectory = trainDataBatchStream.zip(dropoutKeys(dropoutSeed)).scanLeft(TrainState(initialParams, initialOptimizerState, Tensor0(-1f))):
-    case (state, (batch, dropoutKey)) =>
+  val trainTrajectory = trainDataBatchStream.scanLeft(TrainState(initialParams, initialOptimizerState, Random.Key(42), Tensor0(-1f))):
+    case (state, batch) =>
       dimwit.gc()
-      jitGradientStep(batch, state.params.imageEmbeddingDropout.thinned(dropoutProbability, dropoutKey), state)
+      jitGradientStep(batch, state)
 
   val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
   val checkpointer = new TensorTreeCheckpointer(f"out/MNistCNN/$time")
