@@ -22,7 +22,7 @@ trait MultiHeadUnfusedAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, Tar
         case (q, k, v) =>
           val (headValue, perHead) = headAttention(Attention.Params(q, k, v)).applyWithIntermediates(source, target)
           (headValue, perHead.queries, perHead.keys, perHead.values)
-    (headValues.transpose(Axis[Target], Axis[Head], Axis[HeadValue]), (queries = queries.transpose(Axis[Target], Axis[Head], Axis[HeadQuery]), keys = keys.transpose(Axis[Source], Axis[Head], Axis[HeadKey]), values = values.transpose(Axis[Source], Axis[Head], Axis[HeadValue])))
+    (headValues.swap(Axis[Target], Axis[Head]), (queries = queries.swap(Axis[Target], Axis[Head]), keys = keys.swap(Axis[Source], Axis[Head]), values = values.swap(Axis[Source], Axis[Head])))
 
   /** Per-head attention implementation. */
   protected def headAttention(
