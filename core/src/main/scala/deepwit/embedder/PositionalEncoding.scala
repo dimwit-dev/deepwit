@@ -30,7 +30,7 @@ object PositionalEncoding:
     val yPosEncoded = concatenate(yPosScaled.sin, yPosScaled.cos, concatAxis = Axis[Embedding])
 
     // 4. Expansion into 2D Grids and Concatenation
-    val xPosGrid = stack(List.fill(yExtent)(xPosEncoded), newAxis = Axis[Y]).transpose(Axis[X], Axis[Y], Axis[Embedding])
+    val xPosGrid = stack(List.fill(yExtent)(xPosEncoded), newAxis = Axis[Y], afterAxis = Axis[X])
     val yPosGrid = stack(List.fill(xExtent)(yPosEncoded), newAxis = Axis[X])
 
     concatenate(xPosGrid, yPosGrid, concatAxis = Axis[Embedding])
