@@ -54,16 +54,17 @@ object MultiHeadAttention:
     def init[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, V] =
       xavierUniformDepthScaled(numTransformerLayers, numHeads, sourceEmbeddingExtent, targetEmbeddingExtent, key, vtype)
 
-    def xavierUniformHeads[Embedding: Λ, HeadOut: Λ, V: IsFloating](numHeads: Int, embeddingExtent: AxisExtent[Embedding], headExtent: AxisExtent[HeadOut], key: Key, vtype: VType[V] = VType[Float32]): Tensor3[Head, Embedding, HeadOut, V] =
-      stack(key.split(numHeads).map(key => Init.xavierUniform(embeddingExtent, headExtent, key, vtype)), Axis[Head])
-
-    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32]): AffineLayer.Params[In, Out, V] =
-      val gain = Math.sqrt(1.0 / (2 * numLayers)).toFloat
-      AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, key, vtype, gain = gain)
-
     def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, V] =
       require(targetEmbeddingExtent.size % numHeads == 0)
       require(sourceEmbeddingExtent.size % numHeads == 0)
+
+      def xavierUniformHeads[Embedding: Λ, HeadOut: Λ, V: IsFloating](numHeads: Int, embeddingExtent: AxisExtent[Embedding], headExtent: AxisExtent[HeadOut], key: Key, vtype: VType[V] = VType[Float32]): Tensor3[Head, Embedding, HeadOut, V] =
+        stack(key.split(numHeads).map(key => Init.xavierUniform(embeddingExtent, headExtent, key, vtype)), Axis[Head])
+
+      def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32]): AffineLayer.Params[In, Out, V] =
+        val gain = Math.sqrt(1.0 / (2 * numLayers)).toFloat
+        AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, key, vtype, gain = gain)
+
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
       val headExtent = Axis[Head] -> numHeads
       val headQueryExtent = Axis[HeadQuery] -> targetEmbeddingExtent.size / numHeads

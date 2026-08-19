@@ -46,7 +46,7 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
     it("is multi-head attention of the context onto itself"):
       val p = params
       val selfAttention = MultiHeadFullSelfAttention(Axis[Ctx], p)
-      val crossAttention = MultiHeadFullAttention(Axis[Ctx], Axis[Ctx], p.asMultiHeadAttentionParams)
+      val crossAttention = MultiHeadFullAttention(Axis[Ctx], Axis[Ctx], p.multiHeadAttention)
       val x = context(13f)
       selfAttention(x) should approxEqual(crossAttention(x, x), 1e-6f)
 
@@ -69,12 +69,12 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
 
     it("splits the embedding space evenly across the heads"):
       val p = params
-      p.queryWeights.shape(Axis[Head]) shouldBe numHeads
-      p.queryWeights.shape(Axis[HeadQuery]) shouldBe 2
-      p.keyWeights.shape(Axis[HeadKey]) shouldBe 2
-      p.valueWeights.shape(Axis[HeadValue]) shouldBe 2
-      p.outputProjection.weight.shape(Axis[Head |*| HeadValue]) shouldBe 4
-      p.outputProjection.weight.shape(Axis[Emb]) shouldBe 4
+      p.multiHeadAttention.queryWeights.shape(Axis[Head]) shouldBe numHeads
+      p.multiHeadAttention.queryWeights.shape(Axis[HeadQuery]) shouldBe 2
+      p.multiHeadAttention.keyWeights.shape(Axis[HeadKey]) shouldBe 2
+      p.multiHeadAttention.valueWeights.shape(Axis[HeadValue]) shouldBe 2
+      p.multiHeadAttention.outputProjection.weight.shape(Axis[Head |*| HeadValue]) shouldBe 4
+      p.multiHeadAttention.outputProjection.weight.shape(Axis[Emb]) shouldBe 4
 
     it("requires the embedding size to be divisible by the head count"):
       an[IllegalArgumentException] should be thrownBy
