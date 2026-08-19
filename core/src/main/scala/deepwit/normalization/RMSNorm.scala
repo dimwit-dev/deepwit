@@ -6,7 +6,6 @@ import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
-
 class RMSNorm[L: Λ, V: IsFloating](
     params: RMSNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon
@@ -27,5 +26,7 @@ object RMSNorm:
 
   object Params:
 
-    def identity[L: Λ, V: IsFloating](ae: AxisExtent[L], vtype: VType[V]) =
+    def init[L: Λ, V: IsFloating](ae: AxisExtent[L], vtype: VType[V] = VType[Float32]) = identity(ae, vtype)
+
+    def identity[L: Λ, V: IsFloating](ae: AxisExtent[L], vtype: VType[V] = VType[Float32]) =
       Params(weight = Tensor(Shape(ae), vtype).fill(1f))

@@ -2,7 +2,7 @@ package deepwit.attention
 
 import dimwit.*
 import deepwit.base.AffineLayer
-import deepwit.init
+import deepwit.init.Init
 import dimwit.Label as Λ
 import deepwit.attention.AttentionScore.scaledDotProduct
 
@@ -51,14 +51,17 @@ object MultiHeadAttention:
 
   object Params:
 
-    def xavierUniformHeads[Embedding: Λ, HeadOut: Λ, V: IsFloating](numHeads: Int, embeddingExtent: AxisExtent[Embedding], headExtent: AxisExtent[HeadOut], vtype: VType[V], key: Key): Tensor3[Head, Embedding, HeadOut, V] =
-      stack(key.split(numHeads).map(key => init.xavierUniform(embeddingExtent, headExtent, vtype, key)), Axis[Head])
+    def init[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, V] =
+      xavierUniformDepthScaled(numTransformerLayers, numHeads, sourceEmbeddingExtent, targetEmbeddingExtent, key, vtype)
 
-    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], vtype: VType[V], key: Key): AffineLayer.Params[In, Out, V] =
+    def xavierUniformHeads[Embedding: Λ, HeadOut: Λ, V: IsFloating](numHeads: Int, embeddingExtent: AxisExtent[Embedding], headExtent: AxisExtent[HeadOut], key: Key, vtype: VType[V] = VType[Float32]): Tensor3[Head, Embedding, HeadOut, V] =
+      stack(key.split(numHeads).map(key => Init.xavierUniform(embeddingExtent, headExtent, key, vtype)), Axis[Head])
+
+    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32]): AffineLayer.Params[In, Out, V] =
       val gain = Math.sqrt(1.0 / (2 * numLayers)).toFloat
-      AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, vtype, key, gain = gain)
+      AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, key, vtype, gain = gain)
 
-    def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], vtype: VType[V], key: Key): Params[SourceEmbedding, TargetEmbedding, V] =
+    def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, V] =
       require(targetEmbeddingExtent.size % numHeads == 0)
       require(sourceEmbeddingExtent.size % numHeads == 0)
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
@@ -67,10 +70,10 @@ object MultiHeadAttention:
       val headKeyExtent = Axis[HeadKey] -> targetEmbeddingExtent.size / numHeads
       val headValueExtent = Axis[HeadValue] -> sourceEmbeddingExtent.size / numHeads
       Params(
-        queryWeights = xavierUniformHeads(headExtent.size, targetEmbeddingExtent, headQueryExtent, vtype, queryKey),
-        keyWeights = xavierUniformHeads(headExtent.size, sourceEmbeddingExtent, headKeyExtent, vtype, keyKey),
-        valueWeights = xavierUniformHeads(headExtent.size, sourceEmbeddingExtent, headValueExtent, vtype, valueKey),
-        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, targetEmbeddingExtent, vtype, projectionKey)
+        queryWeights = xavierUniformHeads(headExtent.size, targetEmbeddingExtent, headQueryExtent, queryKey, vtype),
+        keyWeights = xavierUniformHeads(headExtent.size, sourceEmbeddingExtent, headKeyExtent, keyKey, vtype),
+        valueWeights = xavierUniformHeads(headExtent.size, sourceEmbeddingExtent, headValueExtent, valueKey, vtype),
+        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, targetEmbeddingExtent, projectionKey, vtype)
       )
 
 /** Multi-head attention where every target position may attend to every source position. */

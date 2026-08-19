@@ -24,6 +24,7 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
   )
 
   private def context(lastRow: Float) =
+    // format: off
     Tensor(Shape(ctxExtent, embExtent)).fromArray(
       Array(
         1f, 2f, 3f, 4f,
@@ -32,6 +33,7 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
         lastRow, lastRow, lastRow, lastRow
       )
     )
+    // format: on
 
   describe("MultiHeadSelfAttention"):
 
@@ -76,4 +78,4 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
 
     it("requires the embedding size to be divisible by the head count"):
       an[IllegalArgumentException] should be thrownBy
-        MultiHeadSelfAttention.Params.xavierUniformDepthScaled(2, 3, embExtent, VType[Float32], Random.Key(42))
+        MultiHeadSelfAttention.Params.xavierUniformDepthScaled(2, 3, embExtent, Random.Key(42))

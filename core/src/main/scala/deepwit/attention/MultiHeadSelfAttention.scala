@@ -31,7 +31,10 @@ object MultiHeadSelfAttention:
 
   object Params:
 
-    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Key): Params[Embedding, V] =
+    def init[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], key: Key, vtype: VType[V] = VType[Float32]): Params[Embedding, V] =
+      xavierUniformDepthScaled(numTransformerLayers, numHeads, embeddingExtent, key, vtype)
+
+    def xavierUniformDepthScaled[Embedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, embeddingExtent: AxisExtent[Embedding], key: Key, vtype: VType[V] = VType[Float32]): Params[Embedding, V] =
       require(embeddingExtent.size % numHeads == 0)
       import MultiHeadAttention.Params.{xavierUniformHeads, xavierUniformOutputProjection}
       val (queryKey, keyKey, valueKey, projectionKey) = key.splitToTuple(4)
@@ -40,10 +43,10 @@ object MultiHeadSelfAttention:
       val headKeyExtent = Axis[HeadKey] -> embeddingExtent.size / numHeads
       val headValueExtent = Axis[HeadValue] -> embeddingExtent.size / numHeads
       Params(
-        queryWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headQueryExtent, vtype, queryKey),
-        keyWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headKeyExtent, vtype, keyKey),
-        valueWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headValueExtent, vtype, valueKey),
-        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, embeddingExtent, vtype, projectionKey)
+        queryWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headQueryExtent, queryKey, vtype),
+        keyWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headKeyExtent, keyKey, vtype),
+        valueWeights = xavierUniformHeads(headExtent.size, embeddingExtent, headValueExtent, valueKey, vtype),
+        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, embeddingExtent, projectionKey, vtype)
       )
 
 /** Multi-head self-attention with [[MultiHeadFullAttention]]. */

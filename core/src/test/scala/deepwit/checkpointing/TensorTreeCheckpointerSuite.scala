@@ -15,7 +15,7 @@ class TensorTreeCheckpointerSuite extends AnyFunSpec with Matchers:
     dir.toFile.deleteOnExit()
     s"${dir.toString}/run"
 
-  private def someParams = AffineLayer.Params.xavierUniform(Axis[A] -> 3, Axis[B] -> 2, VType[Float32], Random.Key(42))
+  private def someParams = AffineLayer.Params.xavierUniform(Axis[A] -> 3, Axis[B] -> 2, Random.Key(42))
 
   describe("TensorTreeCheckpointer"):
 

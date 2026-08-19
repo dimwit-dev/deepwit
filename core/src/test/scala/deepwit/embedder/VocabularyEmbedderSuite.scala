@@ -32,7 +32,7 @@ class VocabularyEmbedderSuite extends AnyFunSpec with Matchers:
       embedder.unembed(embedding) should approxEqual(Tensor(Shape1(vocabExtent)).fromArray(Array(1f, 3f, 5f)), 1e-6f)
 
     it("recovers the token through unembed when the embeddings are orthonormal"):
-      val orthonormal = VocabularyEmbedder(VocabularyEmbedder.Params(Tensor2.eye(vocabExtent, VType[Float32])))
+      val orthonormal = VocabularyEmbedder(VocabularyEmbedder.Params(Tensor2.eye(vocabExtent)))
       (0 until 3).foreach: token =>
         val logits = orthonormal.unembed(orthonormal(Tensor0(token)))
         logits.argmax(Axis[A]).item shouldBe token
@@ -41,12 +41,12 @@ class VocabularyEmbedderSuite extends AnyFunSpec with Matchers:
 
     it("lecunUniform has the requested shape and stays within its bounds"):
       // a = sqrt(3 / embeddingDim) = sqrt(3 / 2)
-      val params = VocabularyEmbedder.Params.lecunUniform(Axis[A] -> 8, Axis[B] -> 2, VType[Float32], Random.Key(42))
+      val params = VocabularyEmbedder.Params.lecunUniform(Axis[A] -> 8, Axis[B] -> 2, Random.Key(42))
       params.vocabularyEmbeddings.shape(Axis[A]) shouldBe 8
       params.vocabularyEmbeddings.shape(Axis[B]) shouldBe 2
       params.vocabularyEmbeddings.abs.max.item should be <= math.sqrt(1.5).toFloat
 
     it("lecunNormal has the requested shape"):
-      val params = VocabularyEmbedder.Params.lecunNormal(Axis[A] -> 8, Axis[B] -> 4, VType[Float32], Random.Key(42))
+      val params = VocabularyEmbedder.Params.lecunNormal(Axis[A] -> 8, Axis[B] -> 4, Random.Key(42))
       params.vocabularyEmbeddings.shape(Axis[A]) shouldBe 8
       params.vocabularyEmbeddings.shape(Axis[B]) shouldBe 4

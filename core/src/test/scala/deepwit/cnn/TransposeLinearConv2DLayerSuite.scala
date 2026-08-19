@@ -47,7 +47,7 @@ class TransposeLinearConv2DLayerSuite extends AnyFunSpec with Matchers:
   describe("TransposeLinearConv2DLayer.Params"):
 
     it("xavierUniform has the kernel shape"):
-      val params = TransposeLinearConv2DLayer.Params.xavierUniform(Axis[H] -> 3, Axis[W] -> 3, Axis[InChannel] -> 2, Axis[OutChannel] -> 4, VType[Float32], Random.Key(42))
+      val params = TransposeLinearConv2DLayer.Params.xavierUniform(Axis[H] -> 3, Axis[W] -> 3, Axis[InChannel] -> 2, Axis[OutChannel] -> 4, Random.Key(42))
       params.kernel.shape(Axis[H]) shouldBe 3
       params.kernel.shape(Axis[W]) shouldBe 3
       params.kernel.shape(Axis[InChannel]) shouldBe 2

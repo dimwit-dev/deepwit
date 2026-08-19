@@ -23,11 +23,14 @@ object LearnedAbsolutePositionalInjector:
 
   object Params:
 
-    def lecunUniform[Context: Λ, Embedding: Λ, V: IsFloating](contextExtent: AxisExtent[Context], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Key, gain: Float = 1.0): Params[Context, Embedding, V] =
+    def init[Context: Λ, Embedding: Λ, V: IsFloating](contextExtent: AxisExtent[Context], embeddingExtent: AxisExtent[Embedding], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1.0): Params[Context, Embedding, V] =
+      lecunNormal(contextExtent, embeddingExtent, key, vtype, gain)
+
+    def lecunUniform[Context: Λ, Embedding: Λ, V: IsFloating](contextExtent: AxisExtent[Context], embeddingExtent: AxisExtent[Embedding], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1.0): Params[Context, Embedding, V] =
       val variance = Tensor0(vtype)(1.0f / embeddingExtent.size)
       val a = gain * (3f * variance).sqrt
       Params(IndependentDistribution.fromUnivariate(Shape(contextExtent, embeddingExtent), Uniform(-a, a)).sample(key))
 
-    def lecunNormal[Context: Λ, Embedding: Λ, V: IsFloating](contextExtent: AxisExtent[Context], embeddingExtent: AxisExtent[Embedding], vtype: VType[V], key: Key, gain: Float = 1.0): Params[Context, Embedding, V] =
+    def lecunNormal[Context: Λ, Embedding: Λ, V: IsFloating](contextExtent: AxisExtent[Context], embeddingExtent: AxisExtent[Embedding], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1.0): Params[Context, Embedding, V] =
       val variance = Tensor0(vtype)(1.0f / embeddingExtent.size)
       Params(Normal.standardIsotropic(Shape(contextExtent, embeddingExtent), scale = gain * variance.sqrt).sample(key))

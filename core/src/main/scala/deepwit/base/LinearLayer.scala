@@ -1,7 +1,7 @@
 package deepwit.base
 
 import dimwit.*
-import deepwit.init
+import deepwit.init.Init
 import dimwit.Label as Λ
 
 /** Represents a learnable linear transformation.
@@ -39,10 +39,13 @@ object LinearLayer:
 
   object Params:
 
-    def identity[In: Λ, V: IsFloating](extent: AxisExtent[In], vtype: VType[V]): Params[In, Prime[In], V] = Params(weight = Tensor2.eye(extent, vtype))
+    def init[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, Out, V] =
+      xavierUniform(inExtent, outExtent, key, vtype, gain)
 
-    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
-      Params(weight = init.xavierNormal(inExtent, outExtent, vtype, key, gain = gain))
+    def identity[In: Λ, V: IsFloating](extent: AxisExtent[In], vtype: VType[V] = VType[Float32]): Params[In, Prime[In], V] = Params(weight = Tensor2.eye(extent, vtype))
 
-    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
-      Params(weight = init.xavierUniform(inExtent, outExtent, vtype, key, gain = gain))
+    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, Out, V] =
+      Params(weight = Init.xavierNormal(inExtent, outExtent, key, vtype, gain = gain))
+
+    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, Out, V] =
+      Params(weight = Init.xavierUniform(inExtent, outExtent, key, vtype, gain = gain))

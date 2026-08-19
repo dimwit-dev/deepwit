@@ -3,6 +3,8 @@ package deepwit.base
 import dimwit.*
 import dimwit.Label as Λ
 
+import deepwit.init.Init
+
 /** Represents a learnable affine transformation.
   *
   * Mathematically, this layer computes $y = x W + b$, where $x$ is the input
@@ -34,20 +36,23 @@ object AffineLayer:
 
   object Params:
 
-    def identity[In: Λ, V: IsFloating](extent: AxisExtent[In], vtype: VType[V]): Params[In, Prime[In], V] =
+    def init[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, Out, V] =
+      xavierUniform(inExtent, outExtent, key, vtype, gain)
+
+    def identity[In: Λ, V: IsFloating](extent: AxisExtent[In], vtype: VType[V] = VType[Float32]): Params[In, Prime[In], V] =
       Params(
         weight = Tensor2.eye(extent, vtype),
         bias = Tensor(Shape(Axis[Prime[In]] -> extent.size), vtype).fill(0f)
       )
 
-    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierNormal[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, Out, V] =
       Params(
-        weight = deepwit.init.xavierNormal(inExtent, outExtent, vtype, key, gain = gain),
+        weight = Init.xavierNormal(inExtent, outExtent, key, vtype, gain = gain),
         bias = Tensor(Shape(outExtent), vtype).fill(0f)
       )
 
-    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, Out, V] =
+    def xavierUniform[In: Λ, Out: Λ, V: IsFloating](inExtent: AxisExtent[In], outExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, Out, V] =
       Params(
-        weight = deepwit.init.xavierUniform(inExtent, outExtent, vtype, key, gain = gain),
+        weight = Init.xavierUniform(inExtent, outExtent, key, vtype, gain = gain),
         bias = Tensor(Shape(outExtent), vtype).fill(0f)
       )

@@ -6,7 +6,6 @@ import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
-
 class LayerNorm[L: Λ, V: IsFloating](
     params: LayerNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon
@@ -26,7 +25,10 @@ object LayerNorm:
   case class Params[L, V](weight: Tensor1[L, V], bias: Tensor1[L, V])
 
   object Params:
-    def identity[L: Λ, V: IsFloating](ae: AxisExtent[L], vtype: VType[V]) =
+
+    def init[L: Λ, V: IsFloating](ae: AxisExtent[L], vtype: VType[V] = VType[Float32]) = identity(ae, vtype)
+
+    def identity[L: Λ, V: IsFloating](ae: AxisExtent[L], vtype: VType[V] = VType[Float32]) =
       Params(
         weight = Tensor(Shape(ae), vtype).fill(1f),
         bias = Tensor(Shape(ae), vtype).fill(0f)

@@ -1,7 +1,7 @@
 package deepwit.base
 
 import dimwit.*
-import deepwit.init
+import deepwit.init.Init
 import dimwit.Label as Λ
 
 /** Represents a learnable linear form.
@@ -39,8 +39,11 @@ object LinearFormLayer:
 
   object Params:
 
-    def xavierNormal[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, V] =
-      Params(weight = init.xavierNormalVector(inExtent, vtype, key, gain = gain))
+    def init[In: Λ, V: IsFloating](inExtent: AxisExtent[In], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, V] =
+      xavierUniform(inExtent, key, vtype, gain)
 
-    def xavierUniform[In: Λ, V: IsFloating](inExtent: AxisExtent[In], vtype: VType[V], key: Key, gain: Float = 1f): Params[In, V] =
-      Params(weight = init.xavierUniformVector(inExtent, vtype, key, gain = gain))
+    def xavierNormal[In: Λ, V: IsFloating](inExtent: AxisExtent[In], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, V] =
+      Params(weight = Init.xavierNormalVector(inExtent, key, vtype, gain = gain))
+
+    def xavierUniform[In: Λ, V: IsFloating](inExtent: AxisExtent[In], key: Key, vtype: VType[V] = VType[Float32], gain: Float = 1f): Params[In, V] =
+      Params(weight = Init.xavierUniformVector(inExtent, key, vtype, gain = gain))

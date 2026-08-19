@@ -47,6 +47,8 @@ object Dropout:
 
   object Params:
 
-    /** The identity projection: every feature passes through untouched. */
-    def identity[Feature: Λ, V: IsFloating](featureExtent: AxisExtent[Feature], vtype: VType[V]): Params[Feature, V] =
+    def init[Feature: Λ, V: IsFloating](featureExtent: AxisExtent[Feature], vtype: VType[V] = VType[Float32]): Params[Feature, V] =
+      identity(featureExtent, vtype)
+
+    def identity[Feature: Λ, V: IsFloating](featureExtent: AxisExtent[Feature], vtype: VType[V] = VType[Float32]): Params[Feature, V] =
       Params(Tensor(Shape1(featureExtent), vtype).fill(1f))

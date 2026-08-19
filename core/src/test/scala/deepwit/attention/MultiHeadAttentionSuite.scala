@@ -112,6 +112,6 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
 
     it("requires both embedding sizes to be divisible by the head count"):
       an[IllegalArgumentException] should be thrownBy
-        MultiHeadAttention.Params.xavierUniformDepthScaled(2, 3, Axis[SrcEmb] -> 4, embExtent, VType[Float32], Random.Key(42))
+        MultiHeadAttention.Params.xavierUniformDepthScaled(2, 3, Axis[SrcEmb] -> 4, embExtent, Random.Key(42))
       an[IllegalArgumentException] should be thrownBy
-        MultiHeadAttention.Params.xavierUniformDepthScaled(2, 2, Axis[SrcEmb] -> 5, embExtent, VType[Float32], Random.Key(42))
+        MultiHeadAttention.Params.xavierUniformDepthScaled(2, 2, Axis[SrcEmb] -> 5, embExtent, Random.Key(42))

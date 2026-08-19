@@ -31,7 +31,7 @@ class LearnedAbsolutePositionalInjectorSuite extends AnyFunSpec with Matchers:
       injector(context) should approxEqual(context, 1e-6f)
 
     it("distinguishes positions"):
-      val params = LearnedAbsolutePositionalInjector.Params.lecunNormal(contextExtent, embeddingExtent, VType[Float32], Random.Key(42))
+      val params = LearnedAbsolutePositionalInjector.Params.lecunNormal(contextExtent, embeddingExtent, Random.Key(42))
       val injector = LearnedAbsolutePositionalInjector(params)
       val context = Tensor(Shape(contextExtent, embeddingExtent)).fill(0f)
       val injected = injector(context)
@@ -43,12 +43,12 @@ class LearnedAbsolutePositionalInjectorSuite extends AnyFunSpec with Matchers:
 
     it("lecunUniform has the requested shape and stays within its bounds"):
       // a = sqrt(3 / embeddingDim) = sqrt(3 / 4)
-      val params = LearnedAbsolutePositionalInjector.Params.lecunUniform(Axis[A] -> 6, Axis[B] -> 4, VType[Float32], Random.Key(42))
+      val params = LearnedAbsolutePositionalInjector.Params.lecunUniform(Axis[A] -> 6, Axis[B] -> 4, Random.Key(42))
       params.positionalEmbeddings.shape(Axis[A]) shouldBe 6
       params.positionalEmbeddings.shape(Axis[B]) shouldBe 4
       params.positionalEmbeddings.abs.max.item should be <= math.sqrt(0.75).toFloat
 
     it("lecunNormal has the requested shape"):
-      val params = LearnedAbsolutePositionalInjector.Params.lecunNormal(Axis[A] -> 6, Axis[B] -> 4, VType[Float32], Random.Key(42))
+      val params = LearnedAbsolutePositionalInjector.Params.lecunNormal(Axis[A] -> 6, Axis[B] -> 4, Random.Key(42))
       params.positionalEmbeddings.shape(Axis[A]) shouldBe 6
       params.positionalEmbeddings.shape(Axis[B]) shouldBe 4

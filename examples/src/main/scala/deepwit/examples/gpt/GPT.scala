@@ -77,27 +77,20 @@ object GPT:
     given tensorTreeParamsF16: TensorTree[GPT.Params[BFloat16]] = TensorTree.derived
     given tensorTreeParamsF32: TensorTree[GPT.Params[Float32]] = TensorTree.derived
 
-    def init[V: IsFloating](numTransformerLayers: Int)(
+    def gpt2Init[V: IsFloating](numTransformerLayers: Int)(
         vocabExtent: AxisExtent[Vocab],
         contextExtent: AxisExtent[Context],
         numHeads: Int,
         embeddingExtent: AxisExtent[Embedding],
         embeddingMixedExtent: AxisExtent[EmbeddingMixed],
-        vtype: VType[V],
-        key: Key
+        key: Key,
+        vtype: VType[V] = VType[Float32]
     ): Params[V] =
       val (vocabEmbeddingKey, positionalEmbeddingKey, transformerKey, outputProjectionKey) = key.splitToTuple(4)
 
       Params(
-        embedderParams = VocabularyEmbedder.Params.lecunUniform(vocabExtent, embeddingExtent, vtype, vocabEmbeddingKey),
-        positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, vtype, positionalEmbeddingKey),
-        transformer = GPT2Transformer.Params.init(
-          numTransformerLayers,
-          numHeads,
-          embeddingExtent = embeddingExtent,
-          embeddingMixedExtent = embeddingMixedExtent,
-          vtype = vtype,
-          key = transformerKey
-        ),
-        outputProjection = LinearLayer.Params.xavierUniform(embeddingExtent, vocabExtent, vtype, outputProjectionKey)
+        embedderParams = VocabularyEmbedder.Params.lecunUniform(vocabExtent, embeddingExtent, vocabEmbeddingKey, vtype),
+        positionalInjectorParams = LearnedAbsolutePositionalInjector.Params.lecunUniform(contextExtent, embeddingExtent, positionalEmbeddingKey, vtype),
+        transformer = GPT2Transformer.Params.gpt2Init(numTransformerLayers, numHeads, embeddingExtent, embeddingMixedExtent, transformerKey, vtype),
+        outputProjection = LinearLayer.Params.xavierUniform(embeddingExtent, vocabExtent, outputProjectionKey, vtype)
       )

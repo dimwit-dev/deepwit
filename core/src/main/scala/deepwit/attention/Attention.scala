@@ -72,12 +72,15 @@ object Attention:
     def apply[SourceEmbedding, TargetEmbedding, Query, Key, Value, V: IsFloating](wq: Tensor2[TargetEmbedding, Query, V], wk: Tensor2[SourceEmbedding, Key, V], wv: Tensor2[SourceEmbedding, Value, V]): Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V] =
       new Params(LinearLayer.Params(wq), LinearLayer.Params(wk), LinearLayer.Params(wv))
 
-    def init[SourceEmbedding: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](queryExtent: AxisExtent[Query], keyExtent: AxisExtent[Key], valueExtent: AxisExtent[Value], sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], vtype: VType[V], key: Random.Key): Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V] =
+    def init[SourceEmbedding: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](queryExtent: AxisExtent[Query], keyExtent: AxisExtent[Key], valueExtent: AxisExtent[Value], sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Random.Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V] =
+      xavierUniform(queryExtent, keyExtent, valueExtent, sourceEmbeddingExtent, targetEmbeddingExtent, key, vtype)
+
+    def xavierUniform[SourceEmbedding: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](queryExtent: AxisExtent[Query], keyExtent: AxisExtent[Key], valueExtent: AxisExtent[Value], sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Random.Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V] =
       val (queryKey, keyKey, valueKey) = key.splitToTuple(3)
       Params(
-        queryWeights = LinearLayer.Params.xavierUniform(targetEmbeddingExtent, queryExtent, vtype, queryKey),
-        keyWeights = LinearLayer.Params.xavierUniform(sourceEmbeddingExtent, keyExtent, vtype, keyKey),
-        valueWeights = LinearLayer.Params.xavierUniform(sourceEmbeddingExtent, valueExtent, vtype, valueKey)
+        queryWeights = LinearLayer.Params.xavierUniform(targetEmbeddingExtent, queryExtent, queryKey, vtype),
+        keyWeights = LinearLayer.Params.xavierUniform(sourceEmbeddingExtent, keyExtent, keyKey, vtype),
+        valueWeights = LinearLayer.Params.xavierUniform(sourceEmbeddingExtent, valueExtent, valueKey, vtype)
       )
 
 /** Attention where every target position may attend to every source position. */

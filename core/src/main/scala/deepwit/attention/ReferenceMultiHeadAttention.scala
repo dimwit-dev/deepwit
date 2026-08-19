@@ -42,19 +42,19 @@ object ReferenceMultiHeadAttention:
         headValueExtent: AxisExtent[HeadValue],
         sourceEmbeddingExtent: AxisExtent[SourceEmbedding],
         targetEmbeddingExtent: AxisExtent[TargetEmbedding],
-        vtype: VType[V],
-        key: Key
+        key: Key,
+        vtype: VType[V] = VType[Float32]
     ): List[Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, V]] =
       key
         .split(numHeads)
-        .map(headKey => Attention.Params.init(headQueryExtent, headKeyExtent, headValueExtent, sourceEmbeddingExtent, targetEmbeddingExtent, vtype, headKey))
+        .map(headKey => Attention.Params.init(headQueryExtent, headKeyExtent, headValueExtent, sourceEmbeddingExtent, targetEmbeddingExtent, headKey, vtype))
         .toList
 
-    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], vtype: VType[V], key: Key): AffineLayer.Params[In, Out, V] =
+    def xavierUniformOutputProjection[In: Λ, Out: Λ, V: IsFloating](numLayers: Int, embeddingExtent: AxisExtent[In], headExtent: AxisExtent[Out], key: Key, vtype: VType[V] = VType[Float32]): AffineLayer.Params[In, Out, V] =
       val gain = Math.sqrt(1.0 / (2 * numLayers)).toFloat
-      AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, vtype, key, gain = gain)
+      AffineLayer.Params.xavierUniform(embeddingExtent, headExtent, key, vtype, gain = gain)
 
-    def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], vtype: VType[V], key: Key): Params[SourceEmbedding, TargetEmbedding, V] =
+    def xavierUniformDepthScaled[SourceEmbedding: Λ, TargetEmbedding: Λ, V: IsFloating](numTransformerLayers: Int, numHeads: Int, sourceEmbeddingExtent: AxisExtent[SourceEmbedding], targetEmbeddingExtent: AxisExtent[TargetEmbedding], key: Key, vtype: VType[V] = VType[Float32]): Params[SourceEmbedding, TargetEmbedding, V] =
       require(targetEmbeddingExtent.size % numHeads == 0)
       require(sourceEmbeddingExtent.size % numHeads == 0)
       val (headsKey, projectionKey) = key.splitToTuple(2)
@@ -64,6 +64,6 @@ object ReferenceMultiHeadAttention:
       val headKeyExtent = Axis[HeadKey] -> targetEmbeddingExtent.size / numHeads
       val headValueExtent = Axis[HeadValue] -> sourceEmbeddingExtent.size / numHeads
       Params(
-        heads = xavierUniformHeads(numHeads, headQueryExtent, headKeyExtent, headValueExtent, sourceEmbeddingExtent, targetEmbeddingExtent, vtype, headsKey),
-        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, targetEmbeddingExtent, vtype, projectionKey)
+        heads = xavierUniformHeads(numHeads, headQueryExtent, headKeyExtent, headValueExtent, sourceEmbeddingExtent, targetEmbeddingExtent, headsKey, vtype),
+        outputProjection = xavierUniformOutputProjection(numTransformerLayers, headExtent * headValueExtent, targetEmbeddingExtent, projectionKey, vtype)
       )

@@ -37,10 +37,10 @@ object MNistCNN:
       val embeddingDim = Axis[ImageEmbedding] -> 7 * 7 * numHidden2
       val outputDim = Axis[Output] -> 10
       Params(
-        conv1 = AffineConv2DLayer.Params.xavierUniform(kernelHeightDim, kernelWidthDim, channelDim, hiddenDim, VType[Float32], conv1Key),
-        conv2 = AffineConv2DLayer.Params.xavierUniform(kernelHeightDim, kernelWidthDim, hiddenDim, pixelEmbeddingDim, VType[Float32], conv2Key),
-        imageEmbeddingDropout = Dropout.Params.identity(embeddingDim, VType[Float32]),
-        output = AffineLayer.Params.xavierUniform(embeddingDim, outputDim, VType[Float32], outputKey)
+        conv1 = AffineConv2DLayer.Params.init(kernelHeightDim, kernelWidthDim, channelDim, hiddenDim, conv1Key),
+        conv2 = AffineConv2DLayer.Params.init(kernelHeightDim, kernelWidthDim, hiddenDim, pixelEmbeddingDim, conv2Key),
+        imageEmbeddingDropout = Dropout.Params.init(embeddingDim),
+        output = AffineLayer.Params.init(embeddingDim, outputDim, outputKey)
       )
 
 class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):

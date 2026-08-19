@@ -64,14 +64,14 @@ import Config.*
 
   val (dataKey, initParamsKey) = key.split2()
 
-  val initParams = GPT.Params.init(numTransformerLayers = numLayers)(
+  val initParams = GPT.Params.gpt2Init(numTransformerLayers = numLayers)(
     vocabExtent,
     contextExtent,
     numHeads,
     embeddingExtent,
     embeddingMixedExtent,
-    VType[Float32],
-    initParamsKey
+    initParamsKey,
+    VType[Float32]
   )
 
   val schedule = LinearWarmup(baseLearningRate, 1_000).followBy(CosineDecay(baseLearningRate, minLearningRate, 20_000))

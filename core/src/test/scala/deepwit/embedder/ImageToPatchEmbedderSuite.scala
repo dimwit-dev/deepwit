@@ -21,7 +21,6 @@ class ImageToPatchEmbedderSuite extends AnyFunSpec with Matchers:
       Axis[Height] -> patchExtent,
       Axis[Channel] -> 1,
       embeddingExtent,
-      VType[Float32],
       Random.Key(42)
     )
     ImageToPatchEmbedder(params)
@@ -55,7 +54,6 @@ class ImageToPatchEmbedderSuite extends AnyFunSpec with Matchers:
         Axis[Height] -> 4,
         Axis[Channel] -> 3,
         embeddingExtent,
-        VType[Float32],
         Random.Key(42)
       )
       params.conv.kernel.shape(Axis[Width]) shouldBe 4

@@ -21,8 +21,11 @@ object AffineConv2DLayer:
 
   object Params:
 
-    def xavierUniform[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](s1Extent: AxisExtent[S1], s2Extent: AxisExtent[S2], channelExtent: AxisExtent[InChannel], outChannelExtent: AxisExtent[OutChannel], vtype: VType[V], key: Key): Params[S1, S2, InChannel, OutChannel, V] =
+    def init[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](s1Extent: AxisExtent[S1], s2Extent: AxisExtent[S2], channelExtent: AxisExtent[InChannel], outChannelExtent: AxisExtent[OutChannel], key: Key, vtype: VType[V] = VType[Float32]): Params[S1, S2, InChannel, OutChannel, V] =
+      xavierUniform(s1Extent, s2Extent, channelExtent, outChannelExtent, key, vtype)
+
+    def xavierUniform[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](s1Extent: AxisExtent[S1], s2Extent: AxisExtent[S2], channelExtent: AxisExtent[InChannel], outChannelExtent: AxisExtent[OutChannel], key: Key, vtype: VType[V] = VType[Float32]): Params[S1, S2, InChannel, OutChannel, V] =
       Params(
-        kernel = xavierUniformKernel(s1Extent, s2Extent, channelExtent, outChannelExtent, vtype, key),
+        kernel = xavierUniformKernel(s1Extent, s2Extent, channelExtent, outChannelExtent, key, vtype),
         bias = Tensor(Shape(outChannelExtent), vtype).fill(0f)
       )

@@ -30,6 +30,6 @@ class AffineFormLayerSuite extends AnyFunSpec with Matchers:
       affineFormLayer(t) should approxEqual(Tensor0(16.5f), 1e-6f)
 
     it("xavierNormal has a zero bias and the expected shape"):
-      val params = AffineFormLayer.Params.xavierNormal(Axis[A] -> 5, VType[Float32], Random.Key(42))
+      val params = AffineFormLayer.Params.xavierNormal(Axis[A] -> 5, Random.Key(42))
       params.weight.shape(Axis[A]) shouldBe 5
       params.bias should approxEqual(Tensor0(0f), 1e-6f)

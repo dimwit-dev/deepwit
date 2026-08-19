@@ -56,7 +56,7 @@ def autoEncoderTraining(): Unit =
     TrainState(newParams, newOptimizerState, cost)
   val jitGradientStep = jitDonatingUnsafe(gradientStep)
 
-  val initialParams = Autoencoder.Params.xavierNormal(
+  val initialParams = Autoencoder.Params.init(
     eHidden1Extent,
     eHidden2Extent,
     latentExtent,

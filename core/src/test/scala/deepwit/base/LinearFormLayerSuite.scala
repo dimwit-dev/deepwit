@@ -30,6 +30,6 @@ class LinearFormLayerSuite extends AnyFunSpec with Matchers:
 
     it("xavierUniform stays within the Glorot bounds"):
       // fanIn = 5, fanOut = 1 => a = sqrt(3 * 2 / 6) = 1
-      val params = LinearFormLayer.Params.xavierUniform(Axis[A] -> 5, VType[Float32], Random.Key(42))
+      val params = LinearFormLayer.Params.xavierUniform(Axis[A] -> 5, Random.Key(42))
       params.weight.shape(Axis[A]) shouldBe 5
       params.weight.abs.max.item should be <= 1f
