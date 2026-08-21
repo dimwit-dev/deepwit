@@ -10,8 +10,8 @@ class Autoencoder(params: Autoencoder.Params):
   val encoder = Autoencoder.Encoder(params.encoderParams)
   val decoder = Autoencoder.Decoder(params.decoderParams)
 
-  def logits(x: Tensor1[Pixel, Float32]): Tensor1[ReconstructedPixel, Float32] = decoder.logits(encoder(x))
-  def apply(x: Tensor1[Pixel, Float32]): Tensor1[ReconstructedPixel, Float32] = decoder(encoder(x))
+  def logits(x: Tensor1[Pixel, Float32]): Tensor1[ReconstructedPixel, Float32] = decoder(encoder(x))
+  def reconstruct(x: Tensor1[Pixel, Float32]): Tensor1[ReconstructedPixel, Float32] = sigmoid(logits(x))
 
 object Autoencoder:
 
@@ -31,7 +31,6 @@ object Autoencoder:
         key: Key
     ): Params =
       val inputSize = 28 * 28
-      val vtype = VType[Float32]
       val (encoderKey, decoderKey) = key.splitToTuple(2)
       val (encoderKey1, encoderKey2, encoderKey3) = encoderKey.splitToTuple(3)
       val encoderParams = Encoder.Params(
@@ -71,12 +70,10 @@ object Autoencoder:
     val layer2 = AffineLayer(p.layer2)
     val outputLayer = AffineLayer(p.outputLayer)
 
-    def logits(v: Tensor1[Latent, Float32]): Tensor1[ReconstructedPixel, Float32] =
+    def apply(v: Tensor1[Latent, Float32]): Tensor1[ReconstructedPixel, Float32] =
       val h1 = relu(layer1(v))
       val h2 = relu(layer2(h1))
       outputLayer(h2)
-
-    def apply(v: Tensor1[Latent, Float32]): Tensor1[ReconstructedPixel, Float32] = sigmoid(logits(v))
 
   object Decoder:
     case class Params(

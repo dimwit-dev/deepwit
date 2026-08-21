@@ -12,8 +12,6 @@ import deepwit.training.{Monitor, tapEvery}
 import deepwit.checkpointing.TensorTreeCheckpointer
 import deepwit.regularization.Dropout
 
-private trait Batch derives Label
-
 case class TrainState(
     params: MNistCNN.Params,
     optimizerState: GradientDescentState[MNistCNN.Params],
@@ -22,19 +20,26 @@ case class TrainState(
 )
 
 @main
-def mnistCNNTrain(): Unit =
+def train(): Unit =
+
+  // -- Configuration --
 
   val numIterations = 10_000
   val batchSize = 128
   val learningRate = 0.01f
   val dropoutProbability = 0.2f
 
-  val (paramsKey, dropoutSeed) = Random.Key(42).split2()
+  // -- Prepare train trajectory --
+
+  trait Batch derives Label
+
+  val (initKey, dropoutSeed) = Key(42).split2()
 
   val trainDataset = MNISTLoader.createTrainingDataset().get
   val testDataset = MNISTLoader.createTestDataset().get
 
   val trainDataBatchStream = trainDataset.toBatchStream(Axis[Batch] -> batchSize)
+  val optimizer = GradientDescent(learningRate = learningRate)
 
   def costFnFor[S: Label](images: Tensor3[S, Height, Width, Float32], labels: Tensor1[S, Int32])(params: MNistCNN.Params): Tensor0[Float32] =
     val model = MNistCNN(params)
@@ -42,8 +47,6 @@ def mnistCNNTrain(): Unit =
       val logits = model.logits(image)
       CategoricalCrossEntropy.fromLogits(label, logits)
     .mean
-
-  val optimizer = GradientDescent(learningRate = learningRate)
 
   def gradientStep(
       batch: MNISTBatchSample[Batch],
@@ -56,19 +59,22 @@ def mnistCNNTrain(): Unit =
     TrainState(newParams, newOptimizerState, nextKey, cost)
   val jitGradientStep = jitDonatingUnsafe(gradientStep)
 
-  val initialParams = MNistCNN.Params(paramsKey)(16, 32)
-  val initialOptimizerState = optimizer.init(initialParams)
+  val initialState =
+    val initialParams = MNistCNN.Params.init(16, 32, initKey)
+    val initialOptimizerState = optimizer.init(initialParams)
+    TrainState(initialParams, initialOptimizerState, dropoutSeed, Tensor0(-1f))
 
-  val trainTrajectory = trainDataBatchStream.scanLeft(TrainState(initialParams, initialOptimizerState, Random.Key(42), Tensor0(-1f))):
+  val trainTrajectory = trainDataBatchStream.scanLeft(initialState):
     case (state, batch) =>
-      dimwit.gc()
       jitGradientStep(batch, state)
 
-  val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val checkpointer = new TensorTreeCheckpointer(f"out/MNistCNN/$time")
-  val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
+  // -- Run train trajectory --
 
-  val state = trainTrajectory
+  val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+  val checkpointPath = f"out/MNistCNN/$time"
+  val checkpointer = new TensorTreeCheckpointer(checkpointPath)
+  val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
+  val finalState = trainTrajectory
     .tapEvery(10):
       // Print training progress
       case (state, step) => println(trainMonitor.report(step, state))
@@ -85,3 +91,5 @@ def mnistCNNTrain(): Unit =
         println(s"Checkpoint saved at epoch $step")
     .drop(numIterations)
     .next()
+
+  println(s"Done. Wrote $checkpointPath.")

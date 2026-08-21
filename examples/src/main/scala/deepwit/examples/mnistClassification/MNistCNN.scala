@@ -7,6 +7,21 @@ import deepwit.activation.relu
 import deepwit.cnn.AffineConv2DLayer
 import deepwit.regularization.Dropout
 
+class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):
+  private val conv1 = AffineConv2DLayer(params.conv1, stride = 2, padding = Padding.SAME)
+  private val conv2 = AffineConv2DLayer(params.conv2, stride = 2, padding = Padding.SAME)
+  private val imageEmbeddingDropout = Dropout(params.imageEmbeddingDropout)
+  private val output = AffineLayer(params.output)
+
+  def logits(image: Tensor2[Height, Width, Float32]): Tensor1[Output, Float32] =
+    val input = image.appendAxis(Axis[Channel])
+    val hidden = relu(conv1(input))
+    val pixelEmbeddings = relu(conv2(hidden))
+    val imageEmbedding = pixelEmbeddings.flatten
+    output(imageEmbeddingDropout(imageEmbedding))
+
+  override def apply(image: Tensor2[Height, Width, Float32]): Tensor0[Int32] = logits(image).argmax(Axis[Output])
+
 object MNistCNN:
 
   case class Params(
@@ -24,11 +39,12 @@ object MNistCNN:
       copy(imageEmbeddingDropout = imageEmbeddingDropout.thinned(probability, key))
 
   object Params:
-    def apply(paramKey: Key)(
+    def init(
         numHidden1: Int,
-        numHidden2: Int
+        numHidden2: Int,
+        key: Key
     ): Params =
-      val (conv1Key, conv2Key, outputKey) = paramKey.splitToTuple(3)
+      val (conv1Key, conv2Key, outputKey) = key.splitToTuple(3)
       val kernelHeightDim = Axis[Height] -> 3
       val kernelWidthDim = Axis[Width] -> 3
       val channelDim = Axis[Channel] -> 1
@@ -42,18 +58,3 @@ object MNistCNN:
         imageEmbeddingDropout = Dropout.Params.init(embeddingDim),
         output = AffineLayer.Params.init(embeddingDim, outputDim, outputKey)
       )
-
-class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):
-  private val conv1 = AffineConv2DLayer(params.conv1, stride = 2, padding = Padding.SAME)
-  private val conv2 = AffineConv2DLayer(params.conv2, stride = 2, padding = Padding.SAME)
-  private val imageEmbeddingDropout = Dropout(params.imageEmbeddingDropout)
-  private val output = AffineLayer(params.output)
-
-  def logits(image: Tensor2[Height, Width, Float32]): Tensor1[Output, Float32] =
-    val input = image.appendAxis(Axis[Channel])
-    val hidden = relu(conv1(input))
-    val pixelEmbeddings = relu(conv2(hidden))
-    val imageEmbedding = pixelEmbeddings.flatten
-    output(imageEmbeddingDropout(imageEmbedding))
-
-  override def apply(image: Tensor2[Height, Width, Float32]): Tensor0[Int32] = logits(image).argmax(Axis[Output])

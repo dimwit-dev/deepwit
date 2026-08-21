@@ -5,11 +5,8 @@ import deepwit.examples.dataset.MNISTLoader
 
 export MNISTLoader.{Height, Width}
 
-trait Hidden derives Label
-trait Output derives Label
-
 type Pixel = Height |*| Width
-type ReconstructedPixel = Height |*| Width
+type ReconstructedPixel = Pixel
 
 trait EHidden1 derives Label
 trait EHidden2 derives Label
