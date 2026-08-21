@@ -1,7 +1,6 @@
 package deepwit.attention
 
 import dimwit.*
-import dimwit.Conversions.given
 import deepwit.activation.softmax
 import deepwit.base.LinearLayer
 import dimwit.Label as Λ

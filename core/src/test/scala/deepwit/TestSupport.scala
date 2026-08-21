@@ -4,7 +4,6 @@ package deepwit
 
 import dimwit.*
 
-
 import org.scalatest.matchers.{Matcher, MatchResult}
 
 trait A derives Label

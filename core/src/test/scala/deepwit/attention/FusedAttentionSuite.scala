@@ -3,7 +3,6 @@ package deepwit.attention
 import deepwit.*
 import deepwit.base.AffineLayer
 import dimwit.*
-import dimwit.Conversions.given
 import dimwit.stats.Normal
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec

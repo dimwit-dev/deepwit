@@ -1,12 +1,7 @@
 package deepwit.attention
 
 import dimwit.*
-import dimwit.hardware.DeviceBackend
-import dimwit.jax.Jax
-import dimwit.python.PyBridge
 import dimwit.Label as Λ
-import me.shadaj.scalapy.py
-import me.shadaj.scalapy.py.SeqConverters
 
 /** Marker trait for multi-head attention implementations that uses unfused, per-head attention. */
 trait MultiHeadUnfusedAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating]:

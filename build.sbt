@@ -8,6 +8,11 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.8.1"
 ThisBuild / organization := "ch.contrafactus"
 
+// scalafix's RemoveUnused reads the compiler's own unused warnings on Scala 3, so it needs both
+// semanticdb and -Wunused to be on. Run it with `sbt scalafixAll`.
+ThisBuild / semanticdbEnabled := true
+ThisBuild / scalacOptions += "-Wunused:imports"
+
 // Add resolver for snapshot dependencies
 ThisBuild / resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 

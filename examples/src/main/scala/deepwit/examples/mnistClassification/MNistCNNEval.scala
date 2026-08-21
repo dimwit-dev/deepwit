@@ -6,8 +6,6 @@ import deepwit.examples.dataset.MNISTLoader
 
 import dimwit.*
 import dimwit.Conversions.given
-import deepwit.loss.CategoricalCrossEntropy
-import deepwit.activation.softmax
 import plotwit.*
 
 import plotwit.PlotTargets.desktopBrowser

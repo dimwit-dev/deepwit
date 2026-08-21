@@ -4,7 +4,6 @@ import dimwit.*
 import deepwit.base.AffineLayer
 import deepwit.init.Init
 import dimwit.Label as Λ
-import deepwit.attention.AttentionScore.scaledDotProduct
 
 /** Represents a multi-head attention mechanism from a target sequence of embeddings onto a source sequence of embeddings and projecting the result back to the target embedding space.
   *

@@ -1,7 +1,6 @@
 package deepwit.attention
 
 import dimwit.*
-import deepwit.base.AffineLayer
 import dimwit.Label as Λ
 
 /** Represents multi-head self-attention, i.e. multi-head attention of a sequence onto itself. */

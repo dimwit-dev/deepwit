@@ -3,8 +3,6 @@ package deepwit.examples.neuralImage
 import dimwit.*
 import dimwit.{Label, |*|}
 
-import deepwit.embedder.PositionalEncoding
-
 trait Height derives Label
 trait Width derives Label
 type Pixel = Height |*| Width

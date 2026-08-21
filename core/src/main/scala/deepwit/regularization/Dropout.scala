@@ -1,7 +1,6 @@
 package deepwit.regularization
 
 import dimwit.*
-import dimwit.Conversions.given
 import dimwit.stats.Bernoulli
 import dimwit.Label as Λ
 

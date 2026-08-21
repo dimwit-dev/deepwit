@@ -9,23 +9,6 @@ import deepwit.examples.newestRun
 
 import plotwit.PlotTargets.desktopBrowser
 
-/** Evaluates the network at every position it is given, turning the function back into an image. */
-def render(
-    params: NeuralImage.Params,
-    coordinates: Tensor2[Pixel, PixelCoordinate, Float32],
-    grid: Shape2[Height, Width]
-): Tensor3[Height, Width, Channel, Float32] =
-  coordinates.vmap(Axis[Pixel])(NeuralImage(params)).unflatten(Axis[Pixel], grid)
-
-/** Repeats each pixel `zoom` times along both axes, which adds nothing to an image but the size it
-  * is drawn at: the way to show a small one beside a large one without claiming to have zoomed it.
-  */
-def nearest(image: Tensor3[Height, Width, Channel, Float32], zoom: Int): Tensor3[Height, Width, Channel, Float32] =
-  def repeated(extent: Int) = (0 until extent * zoom).map(_ / zoom).toIndexedSeq
-  image
-    .slice(Axis[Height].at(repeated(image.shape(Axis[Height]))))
-    .slice(Axis[Width].at(repeated(image.shape(Axis[Width]))))
-
 @main
 def eval(givenPath: String*): Unit =
 
@@ -83,6 +66,23 @@ def eval(givenPath: String*): Unit =
     ))
   )
 
-def prep(img: Tensor3[Height, Width, Channel, Float32]): Tensor3[Width, Height, Channel, UInt8] =
+private def prep(img: Tensor3[Height, Width, Channel, Float32]): Tensor3[Width, Height, Channel, UInt8] =
   (img.clip(0f, 1f) *! 255f).asInt(VType[UInt8])
     .swap(Axis[Height], Axis[Width])
+
+/** Evaluates the network at every position it is given, turning the function back into an image. */
+private def render(
+    params: NeuralImage.Params,
+    coordinates: Tensor2[Pixel, PixelCoordinate, Float32],
+    grid: Shape2[Height, Width]
+): Tensor3[Height, Width, Channel, Float32] =
+  coordinates.vmap(Axis[Pixel])(NeuralImage(params)).unflatten(Axis[Pixel], grid)
+
+/** Repeats each pixel `zoom` times along both axes, which adds nothing to an image but the size it
+  * is drawn at: the way to show a small one beside a large one without claiming to have zoomed it.
+  */
+private def nearest(image: Tensor3[Height, Width, Channel, Float32], zoom: Int): Tensor3[Height, Width, Channel, Float32] =
+  def repeated(extent: Int) = (0 until extent * zoom).map(_ / zoom).toIndexedSeq
+  image
+    .slice(Axis[Height].at(repeated(image.shape(Axis[Height]))))
+    .slice(Axis[Width].at(repeated(image.shape(Axis[Width]))))

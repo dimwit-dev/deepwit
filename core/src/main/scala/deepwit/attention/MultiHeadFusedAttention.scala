@@ -6,7 +6,6 @@ import dimwit.jax.Jax
 import dimwit.python.PyBridge
 import dimwit.Label as Λ
 import me.shadaj.scalapy.py
-import me.shadaj.scalapy.py.SeqConverters
 import scala.util.Try
 
 /** Marker trait for multi-head attention implementations that use [[FusedMultiHeadAttentionKernel]]. Restricted to BFloat16 due to kernel constraints. */

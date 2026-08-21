@@ -3,7 +3,6 @@ package deepwit.loss
 import deepwit.*
 import deepwit.activation.{sigmoid, softmax}
 import dimwit.*
-import dimwit.Conversions.given
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec
 

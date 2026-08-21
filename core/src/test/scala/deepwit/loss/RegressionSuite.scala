@@ -1,7 +1,6 @@
 package deepwit.loss
 
 import dimwit.*
-import dimwit.Conversions.given
 import dimwit.stats.Normal
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.funspec.AnyFunSpec

@@ -14,11 +14,9 @@ import java.time.format.DateTimeFormatter
 import FineWebDataset.{BatchSample, batchStream}
 
 import dimwit.TreeOf.map
-import me.shadaj.scalapy.py
 
 import deepwit.optimizer.LearningRateSchedule
 import deepwit.optimizer.LearningRateSchedules.LinearWarmup
-import deepwit.training.Monitor.PerformanceMonitor
 
 object Config:
   val runningBatchSize = 64 // 12

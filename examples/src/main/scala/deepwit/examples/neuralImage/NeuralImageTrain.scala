@@ -8,17 +8,17 @@ import deepwit.training.{Monitor, tapEvery}
 import deepwit.checkpointing.TensorTreeCheckpointer
 import deepwit.loss.SquaredError
 
+case class TrainState(
+    params: NeuralImage.Params,
+    optimizerState: AdamState[NeuralImage.Params],
+    lastCost: Tensor0[Float32]
+)
+
 trait Batch derives Label
 
 case class TrainBatch(
     coordinates: Tensor2[Batch, PixelCoordinate, Float32],
     targets: Tensor2[Batch, Channel, Float32]
-)
-
-case class TrainState(
-    params: NeuralImage.Params,
-    optimizerState: AdamState[NeuralImage.Params],
-    lastCost: Tensor0[Float32]
 )
 
 def costFnFor(
@@ -49,6 +49,7 @@ def batchStream(
     val batchPixels = coordinatesShuffled.slice(Axis[Pixel].at(batchIds)).relabel(Axis[Pixel], Axis[Batch])
     val batchLabels = targetsShuffled.slice(Axis[Pixel].at(batchIds)).relabel(Axis[Pixel], Axis[Batch])
     TrainBatch(batchPixels, batchLabels)
+
 @main
 def train(): Unit =
 
