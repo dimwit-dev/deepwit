@@ -5,12 +5,10 @@ import dimwit.*
 import deepwit.base.AffineLayer
 import deepwit.activation.relu
 import deepwit.cnn.AffineConv2DLayer
-import deepwit.regularization.Dropout
 
 class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32] => Tensor0[Int32]):
   private val conv1 = AffineConv2DLayer(params.conv1, stride = 2, padding = Padding.SAME)
   private val conv2 = AffineConv2DLayer(params.conv2, stride = 2, padding = Padding.SAME)
-  private val imageEmbeddingDropout = Dropout(params.imageEmbeddingDropout)
   private val output = AffineLayer(params.output)
 
   def logits(image: Tensor2[Height, Width, Float32]): Tensor1[Output, Float32] =
@@ -18,7 +16,7 @@ class MNistCNN(params: MNistCNN.Params) extends (Tensor2[Height, Width, Float32]
     val hidden = relu(conv1(input))
     val pixelEmbeddings = relu(conv2(hidden))
     val imageEmbedding = pixelEmbeddings.flatten
-    output(imageEmbeddingDropout(imageEmbedding))
+    output(imageEmbedding)
 
   override def apply(image: Tensor2[Height, Width, Float32]): Tensor0[Int32] = logits(image).argmax(Axis[Output])
 
@@ -27,16 +25,8 @@ object MNistCNN:
   case class Params(
       conv1: AffineConv2DLayer.Params[Height, Width, Channel, Hidden, Float32],
       conv2: AffineConv2DLayer.Params[Height, Width, Hidden, PixelEmbedding, Float32],
-      imageEmbeddingDropout: Dropout.Params[ImageEmbedding, Float32],
       output: AffineLayer.Params[ImageEmbedding, Output, Float32]
-  ):
-
-    /** The same parameters with the dropout projection thinned, as a training step wants them.
-      *
-      * Thinning at inference is what turns a single model into a Monte Carlo ensemble of itself.
-      */
-    def thinned(probability: Float, key: Key): Params =
-      copy(imageEmbeddingDropout = imageEmbeddingDropout.thinned(probability, key))
+  )
 
   object Params:
     def init(
@@ -55,6 +45,5 @@ object MNistCNN:
       Params(
         conv1 = AffineConv2DLayer.Params.init(kernelHeightDim, kernelWidthDim, channelDim, hiddenDim, conv1Key),
         conv2 = AffineConv2DLayer.Params.init(kernelHeightDim, kernelWidthDim, hiddenDim, pixelEmbeddingDim, conv2Key),
-        imageEmbeddingDropout = Dropout.Params.init(embeddingDim),
         output = AffineLayer.Params.init(embeddingDim, outputDim, outputKey)
       )
