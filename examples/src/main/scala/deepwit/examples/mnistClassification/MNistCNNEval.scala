@@ -1,7 +1,6 @@
 package deepwit.examples.mnistClassification
 
 import deepwit.checkpointing.TensorTreeCheckpointer
-import deepwit.examples.newestRun
 import deepwit.examples.dataset.MNISTLoader
 
 import dimwit.*
@@ -11,18 +10,16 @@ import plotwit.*
 import plotwit.PlotTargets.desktopBrowser
 
 @main
-def eval(givenPath: String*): Unit =
+def eval(): Unit =
 
-  val checkpointPath = givenPath.headOption.getOrElse(newestRun("out/MNistCNN"))
-  val checkpointer = TensorTreeCheckpointer(checkpointPath)
-  val iterations = checkpointer.iterations
-  require(iterations.nonEmpty, s"No checkpoint to render in $checkpointPath.")
-
-  val step = iterations.max
-  println(s"Loading checkpoints from: $checkpointPath, reading the newest at step $step")
+  val runRoot = "out/MNistCNN"
+  val checkpointer = TensorTreeCheckpointer.latestIn(runRoot).getOrElse(sys.error(s"Nothing to load: $runRoot holds no run yet. Train first."))
+  val step = checkpointer.iterations.lastOption
+  require(step.nonEmpty, s"No checkpoint to render in ${checkpointer.rootPath}.")
+  println(s"Loading checkpoints from: ${checkpointer.rootPath}, reading the newest at step ${step.get}")
 
   val testDataset = MNISTLoader.createTestDataset().get
-  val model = MNistCNN(checkpointer.load[TrainState](step).get.params)
+  val model = MNistCNN(checkpointer.loadLatest[TrainState].get.params)
 
   val imgGroups = testDataset.images.unstack(Axis[TestSample]).take(640).grouped(64).toList
   val labelGroups = testDataset.labels.unstack(Axis[TestSample]).take(640).grouped(64).toList

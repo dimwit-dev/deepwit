@@ -78,9 +78,7 @@ def train(): Unit =
 
   // -- Run train trajectory --
 
-  val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val checkpointPath = f"out/MoonsMLP/$time"
-  val checkpointer = new TensorTreeCheckpointer(checkpointPath)
+  val checkpointer = TensorTreeCheckpointer.newIn("out/MoonsMLP")
   val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
   val finalState = trainTrajectory
     .tapEvery(100):
@@ -96,4 +94,4 @@ def train(): Unit =
     .next()
 
   println(f"Final cost: ${finalState.lastCost.item}%.6f")
-  println(s"Done. Wrote $checkpointPath.")
+  println(s"Done. Wrote ${checkpointer.rootPath}.")

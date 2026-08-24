@@ -108,8 +108,7 @@ def train(): Unit =
 
   // -- Save final state --
 
-  val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val checkpointPath = f"out/NeuralImage/$time"
-  TensorTreeCheckpointer(checkpointPath).save(finalState, numIterations)
+  val checkpointer = TensorTreeCheckpointer.newIn("out/NeuralImage")
+  checkpointer.save(finalState, numIterations)
   println(f"Final cost: ${finalState.lastCost.item}%.6f")
-  println(s"Done. Wrote $checkpointPath.")
+  println(s"Done. Wrote ${checkpointer.rootPath}.")

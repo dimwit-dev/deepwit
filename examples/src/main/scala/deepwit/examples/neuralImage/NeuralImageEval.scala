@@ -5,26 +5,24 @@ import dimwit.Conversions.given
 import plotwit.*
 
 import deepwit.checkpointing.TensorTreeCheckpointer
-import deepwit.examples.newestRun
 
 import plotwit.PlotTargets.desktopBrowser
 
 @main
-def eval(givenPath: String*): Unit =
+def eval(): Unit =
 
-  val checkpointPath = givenPath.headOption.getOrElse(newestRun("out/NeuralImage"))
   val imageSize = 256
 
-  val checkpointer = TensorTreeCheckpointer(checkpointPath)
-  val iterations = checkpointer.iterations
-  require(iterations.nonEmpty, s"No checkpoint to render in $checkpointPath.")
+  val runRoot = "out/NeuralImage"
+  val checkpointer = TensorTreeCheckpointer.latestIn(runRoot).getOrElse(sys.error(s"Nothing to load: $runRoot holds no run yet. Train first."))
+  val iteration = checkpointer.iterations.lastOption
+  require(iteration.nonEmpty, s"No checkpoint to render in ${checkpointer.rootPath}.")
 
-  val iteration = iterations.max
-  val state = checkpointer.load[TrainState](iteration).get
+  val state = checkpointer.loadLatest[TrainState].get
   // The network's first layer says how many numbers it reads a position as, so the encoding handed
   // to it now is rebuilt to the width it was fitted with rather than to a constant repeated here.
   val encodingSize = state.params.layer1.weight.shape(Axis[PixelCoordinate])
-  println(f"Loaded $checkpointPath after $iteration steps, reading a position as $encodingSize numbers, at cost ${state.lastCost.item}%.6f.")
+  println(f"Loaded ${checkpointer.rootPath} after ${iteration.get} steps, reading a position as $encodingSize numbers, at cost ${state.lastCost.item}%.6f.")
 
   val image = ImageLoader.load(imageSize)
   val heightExtent = Axis[Height] -> imageSize

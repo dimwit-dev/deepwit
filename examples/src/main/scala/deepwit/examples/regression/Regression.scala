@@ -62,7 +62,7 @@ def costFnFor(
 
 case class TrainState(params: MLP.Params, optimizerState: AdamState[MLP.Params])
 
-val checkpointPath = "out/Regression/checkpoint"
+val checkpointRoot = "out/Regression"
 
 // -- Training --
 
@@ -109,8 +109,9 @@ def train(): Unit =
 
   // -- Save the fitted state --
 
-  TensorTreeCheckpointer(checkpointPath, overwrite = true).save(finalState, numIterations)
-  println(s"Done. Wrote $checkpointPath.")
+  val checkpointer = TensorTreeCheckpointer.newIn(checkpointRoot)
+  checkpointer.save(finalState, numIterations)
+  println(s"Done. Wrote ${checkpointer.rootPath}.")
 
 // -- Evaluation --
 
@@ -121,8 +122,10 @@ def eval(): Unit =
   val noiseScale = 0.1f
   val gridSize = 200
 
-  val checkpointer = TensorTreeCheckpointer(checkpointPath)
-  val state = checkpointer.load[TrainState](checkpointer.iterations.max).get
+  val checkpointer = TensorTreeCheckpointer
+    .latestIn(checkpointRoot)
+    .getOrElse(sys.error(s"Nothing to load: $checkpointRoot holds no run yet. Train first."))
+  val state = checkpointer.loadLatest[TrainState].get
   val model = MLP(state.params)
 
   // A different key draws different points, so none of these were fitted to.

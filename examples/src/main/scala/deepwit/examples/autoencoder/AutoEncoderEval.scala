@@ -1,7 +1,6 @@
 package deepwit.examples.autoencoder
 
 import deepwit.checkpointing.TensorTreeCheckpointer
-import deepwit.examples.newestRun
 import deepwit.examples.dataset.MNISTLoader
 import MNISTLoader.TestSample
 
@@ -12,13 +11,13 @@ import plotwit.*
 import plotwit.PlotTargets.desktopBrowser
 
 @main
-def eval(givenPath: String*): Unit =
+def eval(): Unit =
 
-  val checkpointPath = givenPath.headOption.getOrElse(newestRun("out/AutoEncoder"))
-  val checkpointer = TensorTreeCheckpointer(checkpointPath)
+  val runRoot = "out/AutoEncoder"
+  val checkpointer = TensorTreeCheckpointer.latestIn(runRoot).getOrElse(sys.error(s"Nothing to load: $runRoot holds no run yet. Train first."))
   val iterations = checkpointer.iterations
-  require(iterations.nonEmpty, s"No checkpoint to render in $checkpointPath.")
-  println(s"Loading checkpoints from: $checkpointPath, steps ${iterations.mkString(", ")}")
+  require(iterations.nonEmpty, s"No checkpoint to render in ${checkpointer.rootPath}.")
+  println(s"Loading checkpoints from: ${checkpointer.rootPath}, steps ${iterations.mkString(", ")}")
 
   val originals = MNISTLoader.createTestDataset().get.images
     .slice(Axis[TestSample].at(0 until 64))

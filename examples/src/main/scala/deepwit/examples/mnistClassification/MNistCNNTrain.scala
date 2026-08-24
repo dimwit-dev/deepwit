@@ -65,9 +65,7 @@ def train(): Unit =
 
   // -- Run train trajectory --
 
-  val time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val checkpointPath = f"out/MNistCNN/$time"
-  val checkpointer = new TensorTreeCheckpointer(checkpointPath)
+  val checkpointer = TensorTreeCheckpointer.newIn("out/MNistCNN")
   val trainMonitor = Monitor.default[TrainState](batchSize = batchSize, lossLens = state => state.lastCost.item)
   val finalState = trainTrajectory
     .tapEvery(10):
@@ -86,4 +84,4 @@ def train(): Unit =
     .drop(numIterations)
     .next()
 
-  println(s"Done. Wrote $checkpointPath.")
+  println(s"Done. Wrote ${checkpointer.rootPath}.")

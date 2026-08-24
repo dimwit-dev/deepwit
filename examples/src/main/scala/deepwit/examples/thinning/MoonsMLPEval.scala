@@ -10,7 +10,6 @@ import plotwit.*
 
 import deepwit.activation.softmax
 import deepwit.checkpointing.TensorTreeCheckpointer
-import deepwit.examples.newestRun
 
 import plotwit.PlotTargets.desktopBrowser
 
@@ -22,12 +21,9 @@ import plotwit.PlotTargets.desktopBrowser
   *
   * The moons themselves are covered in training data, so the thinned models agree there. Between and
   * beyond them there is nothing to have pinned the model down, and they come apart.
-  *
-  * @param givenPath The directory a training run wrote its checkpoints to. Left out, the most recent
-  *                  run is read.
   */
 @main
-def eval(givenPath: String*): Unit =
+def eval(): Unit =
 
   val numSamples = 400
   val noiseScale = 0.15f
@@ -37,14 +33,13 @@ def eval(givenPath: String*): Unit =
   val gridSize = 300
   val tilesPerSide = 10
 
-  val checkpointPath = givenPath.headOption.getOrElse(newestRun("out/MoonsMLP"))
-  val checkpointer = TensorTreeCheckpointer(checkpointPath)
-  val iterations = checkpointer.iterations
-  require(iterations.nonEmpty, s"No checkpoint to render in $checkpointPath.")
+  val runRoot = "out/MoonsMLP"
+  val checkpointer = TensorTreeCheckpointer.latestIn(runRoot).getOrElse(sys.error(s"Nothing to load: $runRoot holds no run yet. Train first."))
+  val iteration = checkpointer.iterations.lastOption
+  require(iteration.nonEmpty, s"No checkpoint to render in ${checkpointer.rootPath}.")
 
-  val iteration = iterations.max
-  val state = checkpointer.load[TrainState](iteration).get
-  println(f"Loaded $checkpointPath after $iteration steps, at cost ${state.lastCost.item}%.6f.")
+  val state = checkpointer.loadLatest[TrainState].get
+  println(f"Loaded ${checkpointer.rootPath} after ${iteration.get} steps, at cost ${state.lastCost.item}%.6f.")
 
   val rowExtent = Axis[Row] -> gridSize
   val columnExtent = Axis[Column] -> gridSize

@@ -87,7 +87,7 @@ A model checkpointer serializes the final train state object.
 ```scala
 val finalState = trainTrajectory.drop(numIterations).next()
 
-TensorTreeCheckpointer(checkpointPath).save(finalState, numIterations)
+TensorTreeCheckpointer.newIn(checkpointRoot).save(finalState, numIterations)
 ```
 
 ## What the explicitness buys

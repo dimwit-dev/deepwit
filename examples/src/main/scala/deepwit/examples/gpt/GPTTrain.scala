@@ -9,8 +9,6 @@ import deepwit.optimizer.*
 import dimwit.optimizer.{AdamW, Adam, AdamState}
 import dimwit.TreeOf.ops.*
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import FineWebDataset.{BatchSample, batchStream}
 
 import dimwit.TreeOf.map
@@ -155,8 +153,7 @@ import Config.*
 
   val trainTrajectory = miniBatchGradientDescent(trainStream, initState)
 
-  val time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
-  val logger = TensorTreeCheckpointer(f"out/GPT-2/$time")
+  val logger = TensorTreeCheckpointer.newIn("out/GPT-2")
 
   val trainMonitor = Monitor.ConcatMonitor[TrainingState](List(
     Monitor.StepMonitor(),

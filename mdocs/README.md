@@ -68,7 +68,7 @@ val numIterations = 3_000
 val hiddenSize = 32
 val learningRate = 3e-3f
 val initKey = Key(42)
-val checkpointPath = "out/Regression/checkpoint"
+val checkpointRoot = "out/Regression"
 
 // Stands in for the example's batch stream over a noisy curve. `continually` takes its body by
 // name and the trajectory is never consumed here, so the `???` is never forced.
@@ -115,7 +115,7 @@ A model checkpointer serializes the final train state object.
 ```scala mdoc:compile-only
 val finalState = trainTrajectory.drop(numIterations).next()
 
-TensorTreeCheckpointer(checkpointPath).save(finalState, numIterations)
+TensorTreeCheckpointer.newIn(checkpointRoot).save(finalState, numIterations)
 ```
 
 ## What the explicitness buys
