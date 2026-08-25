@@ -39,6 +39,31 @@ class LearnedAbsolutePositionalInjectorSuite extends AnyFunSpec with Matchers:
       val second = injected.slice(Axis[A].at(1))
       (first - second).abs.max.item should be > 0f
 
+    it("embeds a prefix with the positions it starts at"):
+      // format: off
+      val positional = Tensor(Shape(contextExtent, embeddingExtent)).fromArray(Array[Float](
+        1f, 2f,
+        3f, 4f,
+        5f, 6f
+      ))
+      // format: on
+      val injector = LearnedAbsolutePositionalInjector(LearnedAbsolutePositionalInjector.Params(positional))
+      val prefix = Tensor(Shape(Axis[A] -> 2, embeddingExtent)).fill(10f)
+      val expected = Tensor(Shape(Axis[A] -> 2, embeddingExtent)).fromArray(Array[Float](11f, 12f, 13f, 14f))
+      injector.injectToPrefix(prefix) should approxEqual(expected, 1e-6f)
+
+    it("embeds a full-length context exactly as apply does"):
+      val params = LearnedAbsolutePositionalInjector.Params.lecunNormal(contextExtent, embeddingExtent, Random.Key(42))
+      val injector = LearnedAbsolutePositionalInjector(params)
+      val context = Tensor(Shape(contextExtent, embeddingExtent)).fill(4f)
+      injector.injectToPrefix(context) should approxEqual(injector(context), 1e-6f)
+
+    it("rejects a context longer than the learned positions"):
+      val params = LearnedAbsolutePositionalInjector.Params.lecunNormal(contextExtent, embeddingExtent, Random.Key(42))
+      val injector = LearnedAbsolutePositionalInjector(params)
+      val tooLong = Tensor(Shape(Axis[A] -> 4, embeddingExtent)).fill(1f)
+      an[IllegalArgumentException] should be thrownBy injector.injectToPrefix(tooLong)
+
   describe("LearnedAbsolutePositionalInjector.Params"):
 
     it("lecunUniform has the requested shape and stays within its bounds"):
