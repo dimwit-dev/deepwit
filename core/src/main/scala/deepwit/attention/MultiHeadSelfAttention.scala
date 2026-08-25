@@ -44,6 +44,12 @@ class MultiHeadCausalSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
 /** Multi-head self-attention with [[MultiHeadCustomAttention]]. */
 class MultiHeadCustomSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
-    mask: Shape2[Context, Context] => Tensor2[Context, Context, Bool],
+    mask: AxisExtent[Context] => Tensor2[Context, Context, Bool],
     attentionScore: AttentionScore[Context, Context, HeadQuery, HeadKey, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCustomAttention(params.multiHeadAttention, mask, attentionScore))
+) extends MultiHeadSelfAttention[Context, Embedding, V](
+      MultiHeadCustomAttention(
+        params.multiHeadAttention,
+        shape2 => mask(shape2.extent(Axis[Context])),
+        attentionScore
+      )
+    )
