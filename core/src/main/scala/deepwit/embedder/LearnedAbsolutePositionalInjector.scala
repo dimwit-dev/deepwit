@@ -17,6 +17,12 @@ class LearnedAbsolutePositionalInjector[Context: Λ, Embedding: Λ, V: IsFloatin
   override def apply(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
     context + params.positionalEmbeddings
 
+  def injectToPrefix(context: Tensor2[Context, Embedding, V]): Tensor2[Context, Embedding, V] =
+    val length = context.shape(Axis[Context])
+    val capacity = params.positionalEmbeddings.shape(Axis[Context])
+    require(length <= capacity, s"A context of $length positions was given, but only $capacity were learned.")
+    context + params.positionalEmbeddings.slice(Axis[Context].at(0 until length))
+
 object LearnedAbsolutePositionalInjector:
 
   case class Params[Context, Embedding, V](positionalEmbeddings: Tensor2[Context, Embedding, V])
