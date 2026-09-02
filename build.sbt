@@ -33,7 +33,7 @@ lazy val core = (project in file("core"))
       "org.scalacheck" %% "scalacheck" % "1.18.0" % Test,
       "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % Test,
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
-      "ch.contrafactus" %% "dimwit-core" % "0.1.0-SNAPSHOT" changing ()
+      "ch.contrafactus" %% "dimwit-core" % "0.2-SNAPSHOT" changing ()
     ),
     // ScalaPy drives a single embedded CPython interpreter, and two suites importing jax at the same
     // time race into a partially initialized module. Whichever suites happen to touch a tensor first
@@ -50,7 +50,7 @@ lazy val examples = (project in file("examples"))
     name := "deepwit-examples",
     libraryDependencies ++= Seq(
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
-      "ch.contrafactus" %% "plotwit-core" % "0.1.0-SNAPSHOT" changing ()
+      "ch.contrafactus" %% "plotwit-core" % "0.2-SNAPSHOT" changing ()
     ),
     fork := true,
     // Don't publish examples
