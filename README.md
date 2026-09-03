@@ -1,13 +1,27 @@
-# DeepWit
+# DeepWit - A theory-aligned deep learning library
 
-A deep learning library for Scala 3, built on [DimWit](https://github.com/dimwit-dev/dimwit),
-a named tensor library.
-DeepWit's philosophy is the code should read like the theory, which we illustrate here on a regression example:
+> Nothing is as practical as a good theory.
+> 
+> Kurt Lewin
 
-### 1. The module: $f(x; \theta)$
+DeepWit is a deep learning library for Scala 3 built on one idea: **the code should mirror the theory.** DeepWit is build on [DimWit](https://github.com/dimwit-dev/dimwit), a statically typed tensor library with runtime performance on-par with JAX. DeepWit provides core deep learning modules with their minimal conceptual scope to both express their logic clearly and increase reusablility.
 
-In DeepWit, a model is a parameterized function `y = f(x; θ)` that requires an explicit parameter argument.
-The model's parameters $\theta$ are bundled within an explicit `Params` type.
+## Why DeepWit?
+
+DeepWit strips out the framework machinery and leaves the theory standing: no module base class, no indirect loss, no hidden parameters, no hidden gradients, no hidden optimizer states. 
+A module is a parameterized function; a cost function maps those parameters to a scalar, which we differentiate to get the gradients; a training run is an iterator over explicit states.
+And DimWit's semantic tensor types — `Tensor2[Batch, Feature, Float32]` — are what let it all connect.
+
+## Theory-aligned by example
+
+DeepWit is theory-aligned, meaning the code mirros the theory. We demonstrate this here on a minimal `MLP` example: A module is a parameterized function, a cost function maps the parameters to the cost, gradient descent is an iterator over states (train trajectory). Conceptual clarity over hidden machinery.
+
+
+### 1. The module: $f(x; θ)$
+
+In DeepWit, a model is a parameterized function $y = f(x; θ)$ that first requires a parameter argument, to reduce to a function $y = f_θ(x)$ mapping an input $x$ to an output $y$.
+
+The model's parameters $θ$ are bundled within an explicit `Params` type. Here a `MLP` model following this principle. The code `val y = MLP(params)(x)` aligns with $y = f(x; θ)$, where `MLP` is $f$, `params` is $θ$.
 
 ```scala
 // Explicit parameter type
@@ -90,9 +104,19 @@ val finalState = trainTrajectory.drop(numIterations).next()
 TensorTreeCheckpointer.newIn(checkpointRoot).save(finalState, numIterations)
 ```
 
-## What the explicitness buys
+## Examples
 
-TODO
+Examples implemented in DeepWit:
+
+| Example | What it shows |
+| --- | --- |
+| [`regression`](examples/src/main/scala/deepwit/examples/regression/Regression.scala) | The tour above: an MLP on a noisy curve, train and eval in a single file |
+| [`mnistClassification`](examples/src/main/scala/deepwit/examples/mnistClassification/) | Convolutional classifier on MNIST |
+| [`autoencoder`](examples/src/main/scala/deepwit/examples/autoencoder/) | Encoder/decoder with transpose convolutions |
+| [`variationalAutoencoder`](examples/src/main/scala/deepwit/examples/variationalAutoencoder/) | MNIST VAE; the reparameterization trick with an explicit random key |
+| [`neuralImage`](examples/src/main/scala/deepwit/examples/neuralImage/) | MLP that stores an image by mapping coordinates to pixels |
+| [`gpt`](examples/src/main/scala/deepwit/examples/gpt/) | GPT-2 decoder trained on FineWeb |
+| [`thinning`](examples/src/main/scala/deepwit/examples/thinning/) | Two-moons classifier; showcasing network thinning (functional replacement for dropout) |
 
 ## What's in `core`
 
@@ -115,17 +139,26 @@ The user code composes these core modules into custom architectures given the us
 | `deepwit.training` | `Monitor` (step, loss, throughput, learning rate), `tapEvery` |
 | `deepwit.checkpointing` | `TensorTreeCheckpointer` — save and load any `TensorTree` by iteration |
 
-## Examples
+## Relationship to DimWit
 
-Each has a `train` main writing checkpoints, and an `eval`
-main that reads the newest run back.
+DeepWit is the deep learning layer on top of [DimWit](https://github.com/dimwit-dev/dimwit), and the
+boundary between them is deliberately sharp: **everything tensor-shaped lives in DimWit.** DeepWit
+never wraps it, never hides it, and never asks you to learn a second version of it.
 
-| Example | What it shows |
+| DimWit provides | DeepWit adds on top |
 | --- | --- |
-| [`regression`](examples/src/main/scala/deepwit/examples/regression/Regression.scala) | The tour above: an MLP on a noisy curve, train and eval in a single file |
-| [`mnistClassification`](examples/src/main/scala/deepwit/examples/mnistClassification/) | Convolutional classifier on MNIST |
-| [`autoencoder`](examples/src/main/scala/deepwit/examples/autoencoder/) | Encoder/decoder with transpose convolutions |
-| [`variationalAutoencoder`](examples/src/main/scala/deepwit/examples/variationalAutoencoder/) | MNIST VAE; the reparameterization trick with an explicit random key |
-| [`neuralImage`](examples/src/main/scala/deepwit/examples/neuralImage/) | MLP that stores an image by mapping coordinates to pixels |
-| [`gpt`](examples/src/main/scala/deepwit/examples/gpt/) | GPT-2 decoder trained on FineWeb |
-| [`thinning`](examples/src/main/scala/deepwit/examples/thinning/) | Two-moons classifier; showcasing network thinning (functional replacement for dropout) |
+| Tensors over labelled axes — `Tensor2[Batch, Feature, Float32]`, `Shape`, `Axis`, `Label` | Parameterized modules: affine layers, convolutions, attention, transformer blocks, embedders, normalization |
+| `Autodiff.{grad, valueAndGrad, jacobian, hessian}` | Loss functions as maps to a scalar cost |
+| `jit`, `jitDonatingUnsafe` — XLA compilation of a whole step | Initialization schemes as explicit, chosen constructors |
+| `vmap` / `zipvmap` — batching as a caller's decision | Regularization as a perturbation of the parameter tree |
+| Explicit random keys and distributions | Learning rate schedules and gradient clipping |
+| `TensorTree` / `TensorTreeIO` — any parameter case class is a tree | Checkpointing of a whole training state |
+| Gradient optimizers: `GradientDescent`, `Adam`, `AdamW`, `Lion` | The vocabulary a training loop is written in (`Monitor`, `tapEvery`) |
+
+In practice a DeepWit program imports both, and most lines in the tour above are DimWit's: the tensor
+types, `zipvmap`, `Autodiff.grad`, `jitDonatingUnsafe`, `Adam`, the checkpointed `TensorTree`. DeepWit
+contributes the modules, their parameters and their initialization, and the loss. That is also why
+the two are separate libraries — DimWit stands on its own for any numerical work, and DeepWit is what
+you add when that work is a model being fitted.
+
+DeepWit `0.2-SNAPSHOT` tracks DimWit `0.2-SNAPSHOT`; the two versions move together.
