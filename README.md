@@ -125,6 +125,7 @@ main that reads the newest run back.
 | [`regression`](examples/src/main/scala/deepwit/examples/regression/Regression.scala) | The tour above: an MLP on a noisy curve, train and eval in a single file |
 | [`mnistClassification`](examples/src/main/scala/deepwit/examples/mnistClassification/) | Convolutional classifier on MNIST |
 | [`autoencoder`](examples/src/main/scala/deepwit/examples/autoencoder/) | Encoder/decoder with transpose convolutions |
+| [`variationalAutoencoder`](examples/src/main/scala/deepwit/examples/variationalAutoencoder/) | MNIST VAE; the reparameterization trick with an explicit random key |
 | [`neuralImage`](examples/src/main/scala/deepwit/examples/neuralImage/) | MLP that stores an image by mapping coordinates to pixels |
 | [`gpt`](examples/src/main/scala/deepwit/examples/gpt/) | GPT-2 decoder trained on FineWeb |
 | [`thinning`](examples/src/main/scala/deepwit/examples/thinning/) | Two-moons classifier; showcasing network thinning (functional replacement for dropout) |
