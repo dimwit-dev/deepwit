@@ -1,6 +1,6 @@
 package deepwit.checkpointing
 
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -28,11 +28,13 @@ class TensorTreeCheckpointer(
     val path = Path.of(s"$rootPath/$iteration.pkl")
     TensorTreeIO.save(tree, path)
 
+  /** @param iteration The iteration whose checkpoint to read.
+    * @return The tree saved at `iteration`. `None` means absence. Wrong TensorTree structure throws exception.
+    */
   def load[Tree: TensorTree](iteration: Int): Option[Tree] =
     require(iteration >= 0, s"Iteration must be non-negative, but got $iteration")
-    Some: // TODO TensorTreeIO.load must return Option
-      val path = Path.of(s"$rootPath/$iteration.pkl")
-      TensorTreeIO.load[Tree](path)
+    val path = Path.of(s"$rootPath/$iteration.pkl")
+    Option.when(Files.isRegularFile(path))(TensorTreeIO.load[Tree](path))
 
   /** The tree at the furthest iteration saved here, or `None` when there is none. */
   def loadLatest[Tree: TensorTree]: Option[Tree] =
