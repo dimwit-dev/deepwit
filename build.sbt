@@ -13,15 +13,29 @@ ThisBuild / organization := "ch.contrafactus"
 ThisBuild / semanticdbEnabled := true
 ThisBuild / scalacOptions += "-Wunused:imports"
 
-// Add resolver for snapshot dependencies
-ThisBuild / resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+// deepwit tracks the dimwit/plotwit 0.2 snapshots and is itself snapshot-only for now.
+// NOTE: dimwit-core 0.2-SNAPSHOT is not on this resolver yet (only 0.1.0-SNAPSHOT is), and
+// plotwit is not published at all, so both currently resolve from the local ivy repo via
+// `publishLocal`. CI cannot resolve either until dimwit 0.2-SNAPSHOT is published here.
+ThisBuild / resolvers += "Central Portal Snapshots" at "https://central.sonatype.com/repository/maven-snapshots/"
 
 addCommandAlias("testAndCoverage", "; clean; coverage; test; coverageReport")
+
+lazy val uvPython: String =
+  sys.env.getOrElse(
+    "DIMWIT_PYTHON_PATH",
+    Seq("uv", "run", "--no-sync", "python", "-c", "import sys; print(sys.executable)").!!.trim
+  )
+lazy val python = Python(uvPython)
+lazy val scalapyJavaOptions = python.scalapyProperties.get.map { case (k, v) => s"-D$k=$v" }.toSeq
 
 lazy val root = (project in file("."))
   .aggregate(core, examples)
   .settings(
-    name := "deepwit-root"
+    name := "deepwit-root",
+    publish / skip := true,
+    publishLocal / skip := true,
+    publishArtifact := false
   )
 
 lazy val core = (project in file("core"))
@@ -39,6 +53,10 @@ lazy val core = (project in file("core"))
     // time race into a partially initialized module. Whichever suites happen to touch a tensor first
     // then fail with a circular ImportError, so the suites run one after another.
     Test / parallelExecution := false,
+    // Fork with the interpreter that `uvPython` resolved, so a run does not depend on
+    // SCALAPY_PYTHON_LIBRARY / SCALAPY_PYTHON_PROGRAMNAME being exported by the shell.
+    fork := true,
+    javaOptions ++= scalapyJavaOptions,
     Compile / packageSrc / publishArtifact := true,
     Compile / packageDoc / publishArtifact := true
   )
@@ -53,6 +71,7 @@ lazy val examples = (project in file("examples"))
       "ch.contrafactus" %% "plotwit-core" % "0.2-SNAPSHOT" changing ()
     ),
     fork := true,
+    javaOptions ++= scalapyJavaOptions,
     // Don't publish examples
     publish := {},
     publishLocal := {},
@@ -67,20 +86,12 @@ lazy val examples = (project in file("examples"))
     )
   )
 
-lazy val uvPython: String =
-  sys.env.getOrElse(
-    "DIMWIT_PYTHON_PATH",
-    Seq("uv", "run", "--no-sync", "python", "-c", "import sys; print(sys.executable)").!!.trim
-  )
-lazy val python = Python(uvPython)
-lazy val scalapyJavaOptions = python.scalapyProperties.get.map { case (k, v) => s"-D$k=$v" }.toSeq
-
 // Processes files in /mdocs that need to be copied to the root (e.g. README.md)
-lazy val docsRoot = (project in file(".dimwit-docs-root"))
+lazy val docsRoot = (project in file(".deepwit-docs-root"))
   .enablePlugins(MdocPlugin)
   .dependsOn(core)
   .settings(
-    name := "dimwit-docs-root",
+    name := "deepwit-docs-root",
     publish / skip := true,
     mdocIn := (ThisBuild / baseDirectory).value / "mdocs",
     mdocOut := (ThisBuild / baseDirectory).value,

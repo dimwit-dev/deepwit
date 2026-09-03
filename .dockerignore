@@ -1,0 +1,49 @@
+# Build artifacts
+target/
+project/target/
+project/project/target/
+project/project/project/target/
+core/target/
+examples/target/
+.deepwit-docs-root/
+
+.venv/
+.venv-1/
+
+# IDE files
+.bsp/
+.metals/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile.ci
+
+# Python cache
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Data and example output
+data/
+examples/data/
+examples/out/
+
+# Temporary files
+*.tmp
+*.bak

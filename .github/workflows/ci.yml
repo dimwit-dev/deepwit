@@ -1,0 +1,77 @@
+name: CI Build and Test
+
+on:
+  push:
+    branches:
+      - main
+      - cicd
+  pull_request:
+    branches:
+      - main
+  workflow_run:
+    workflows: ["Build and Push CI Docker Image"]
+    types:
+      - completed
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-ci
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      # The image already provides the venv, so dimwit must not try to `uv sync` on top of it.
+      DIMWIT_SKIP_SYNC: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache SBT dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.sbt
+            ~/.ivy2/cache
+            ~/.cache/coursier
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt', 'project/**') }}
+          restore-keys: |
+            ${{ runner.os }}-sbt-
+
+      # TEMPORARY: dimwit 0.2-SNAPSHOT is not published to any remote yet, so CI builds it from source.
+      - name: Check out dimwit
+        uses: actions/checkout@v4
+        with:
+          repository: marcelluethi/dimwit
+          ref: version-0.2-SNAPSHOT
+          path: dimwit
+
+      - name: Publish dimwit-core to the local ivy repo
+        working-directory: dimwit
+        run: sbt core/publishLocal
+
+      - name: Check formatting
+        run: sbt scalafmtCheckAll
+
+      - name: Compile core module
+        run: sbt "project core" compile
+
+      # `examples` depends on plotwit, which is not published yet, so it cannot be built
+      # on a runner. Re-enable this once plotwit is available from a remote resolver.
+      # - name: Compile examples module
+      #   run: sbt "project examples" compile
+
+      - name: Check unused imports (scalafix)
+        run: sbt "core/scalafixAll --check"
+
+      - name: Check if docsRoot is up to date
+        run: sbt "docsRoot/mdoc --check"
+
+      - name: Run tests
+        run: sbt core/test

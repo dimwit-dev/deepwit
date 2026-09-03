@@ -2,7 +2,7 @@ target/*
 project/target/*
 project/project/target/*
 project/project/project/target/*
-.dimwit-docs/target/*
+.deepwit-docs-root/target/*
 .bsp
 .bloop
 .vscode
@@ -19,6 +19,4 @@ ide-*.json
 
 examples/target/*
 core/target/*
-pyproject.toml
-uv.lock
-.dimwit-docs-root
+.deepwit-docs-root/target

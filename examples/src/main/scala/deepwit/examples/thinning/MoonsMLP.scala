@@ -47,7 +47,7 @@ object MoonsMLP:
       val (hidden1Key, hidden2Key) = key.split2()
       copy(
         layer2 = Perturbation.thin(layer2, probability, hidden1Key), // deletes hidden1 features
-        output = Perturbation.thin(output, probability, hidden2Key)  // deletes hidden2 features
+        output = Perturbation.thin(output, probability, hidden2Key) // deletes hidden2 features
       )
 
   object Params:
