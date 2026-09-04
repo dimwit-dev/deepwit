@@ -3,17 +3,12 @@ package deepwit.embedder
 import dimwit.*
 import dimwit.stats.Normal
 import dimwit.stats.Uniform
-import dimwit.jax.Jax
-import dimwit.python.PyBridge.{toPyTensor, liftPyTensor}
 import dimwit.Label as Λ
 
 class VocabularyEmbedder[Vocab: Λ, Embedding: Λ, V: IsFloating](params: VocabularyEmbedder.Params[Vocab, Embedding, V]) extends (Tensor0[Int32] => Tensor1[Embedding, V]):
 
   override def apply(token: Tensor0[Int32]): Tensor1[Embedding, V] =
-    // params.vocabularyEmbeddings.slice(Axis[Vocab].at(token)) // TODO
-    // params.vocabularyEmbeddings.take(Axis[Vocab])(token)
-    val rawJax = Jax.jnp.take(toPyTensor(params.vocabularyEmbeddings), toPyTensor(token), axis = 0)
-    liftPyTensor(rawJax)
+    params.vocabularyEmbeddings.slice(Axis[Vocab].at(token))
 
   def unembed(embedding: Tensor1[Embedding, V]): Tensor1[Vocab, V] =
     embedding.dot(Axis[Embedding])(params.vocabularyEmbeddings)

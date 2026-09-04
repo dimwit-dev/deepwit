@@ -41,19 +41,16 @@ class RegressionSuite extends AnyFunSpec with Matchers:
   describe("Huber"):
 
     it("matches the halved squared error within the transition point"):
-      val loss = Huber(Tensor0(0f), Tensor0(0.5f), threshold = 1f)
+      val loss = Huber(Tensor0(0f), Tensor0(0.5f), transitionPoint = Tensor0(1f))
       loss.item shouldBe (0.5f * 0.25f +- 1e-6f)
 
     it("grows linearly beyond the transition point"):
-      val atFive = Huber(Tensor0(0f), Tensor0(5f), threshold = 1f).item
-      val atSix = Huber(Tensor0(0f), Tensor0(6f), threshold = 1f).item
+      val atFive = Huber(Tensor0(0f), Tensor0(5f), transitionPoint = Tensor0(1f)).item
+      val atSix = Huber(Tensor0(0f), Tensor0(6f), transitionPoint = Tensor0(1f)).item
       atSix - atFive shouldBe (1f +- 1e-4f)
 
     it("joins its two branches continuously at the transition point"):
-      val threshold = 2f
-      val below = Huber(Tensor0(0f), Tensor0(threshold - 1e-3f), threshold).item
-      val above = Huber(Tensor0(0f), Tensor0(threshold + 1e-3f), threshold).item
+      val transitionPoint = 2f
+      val below = Huber(Tensor0(0f), Tensor0(transitionPoint - 1e-3f), Tensor0(transitionPoint)).item
+      val above = Huber(Tensor0(0f), Tensor0(transitionPoint + 1e-3f), Tensor0(transitionPoint)).item
       below shouldBe (above +- 1e-2f)
-
-    it("rejects a non-positive transition point"):
-      an[IllegalArgumentException] should be thrownBy Huber(Tensor0(0f), Tensor0(1f), threshold = 0f)
