@@ -44,6 +44,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sbt-
 
+      # TEMPORARY: dimwit 0.2-SNAPSHOT is not published to any remote yet, so CI builds it from source.
+      - name: Check out dimwit
+        uses: actions/checkout@v4
+        with:
+          repository: marcelluethi/dimwit
+          ref: version-0.2-SNAPSHOT
+          path: dimwit
+
+      - name: Publish dimwit-core to the local ivy repo
+        working-directory: dimwit
+        run: sbt core/publishLocal
+
       - name: Check formatting
         run: sbt scalafmtCheckAll
 

@@ -4,7 +4,7 @@ import scala.sys.process._
 run / fork := true
 Global / cancelable := true
 
-ThisBuild / version := "0.1.0"
+ThisBuild / version := "0.2-SNAPSHOT"
 ThisBuild / scalaVersion := "3.8.1"
 ThisBuild / organization := "ch.contrafactus"
 ThisBuild / versionScheme := Some("early-semver")
@@ -40,16 +40,7 @@ ThisBuild / developers := List(
 // semanticdb and -Wunused to be on. Run it with `sbt scalafixAll`.
 ThisBuild / semanticdbEnabled := true
 ThisBuild / scalacOptions += "-Wunused:imports"
-
-// `core` depends only on released artifacts so that it can be published and consumed without any
-// local publishing. `examples` additionally needs plotwit, which is not published anywhere yet and
-// so still resolves from the local ivy repo via `publishLocal` in the plotwit checkout.
 ThisBuild / resolvers += "Central Portal Snapshots" at "https://central.sonatype.com/repository/maven-snapshots/"
-
-// Consequence of that split: `core` asks for the released dimwit 0.1.0 while the locally published
-// plotwit asks for 0.2-SNAPSHOT, which sbt reads as a binary-incompatible conflict under
-// early-semver. Let the newer snapshot win in `examples`; `core` on its own resolves 0.1.0.
-ThisBuild / libraryDependencySchemes += "ch.contrafactus" %% "dimwit-core" % "always"
 
 addCommandAlias("testAndCoverage", "; clean; coverage; test; coverageReport")
 
@@ -82,7 +73,7 @@ lazy val core = (project in file("core"))
       "org.scalacheck" %% "scalacheck" % "1.18.0" % Test,
       "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % Test,
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
-      "ch.contrafactus" %% "dimwit-core" % "0.1.0"
+      "ch.contrafactus" %% "dimwit-core" % "0.2-SNAPSHOT" changing ()
     ),
     // ScalaPy drives a single embedded CPython interpreter, and two suites importing jax at the same
     // time race into a partially initialized module. Whichever suites happen to touch a tensor first
