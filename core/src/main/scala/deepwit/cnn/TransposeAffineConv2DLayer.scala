@@ -3,6 +3,14 @@ package deepwit.cnn
 import dimwit.*
 import dimwit.Label as Λ
 
+/** The adjoint of a 2D convolution, with bias. For the bias-free equivalent, see
+  * [[TransposeLinearConv2DLayer]].
+  *
+  * @tparam InChannel The forward convolution's input channels, so this layer's output.
+  * @tparam OutChannel The forward convolution's output channels, so this layer's input.
+  * @param stride An `Int` stride applies to both spatial axes. A stride above 1 grows the spatial extents, which is how these layers upsample.
+  * @param padding `Padding.SAME` preserves the spatial extents, while `Padding.VALID` grows them.
+  */
 class TransposeAffineConv2DLayer[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](
     params: TransposeAffineConv2DLayer.Params[S1, S2, InChannel, OutChannel, V],
     stride: Stride2[S1, S2] | Int = 1,

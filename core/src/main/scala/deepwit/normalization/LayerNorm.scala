@@ -6,6 +6,11 @@ import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
+/** Standardizes over the `L` axis, then scales and shifts by the learned parameters, as described
+  * in [Layer Normalization](https://arxiv.org/abs/1607.06450).
+  *
+  * @param epsilon Guards the division. Defaults to the machine epsilon of data type; pass a `Float` to fix it. Pass a function to derive it from the data type.
+  */
 class LayerNorm[L: Λ, V: IsFloating](
     params: LayerNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon

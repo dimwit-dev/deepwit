@@ -4,10 +4,13 @@ import dimwit.*
 import deepwit.base.AffineLayer
 import dimwit.Label as Λ
 
-/** TODO
-  * This implementation is conceptually clearer than [[MultiHeadAttention]] but slower. How to merge?
+/** A readable statement of what [[MultiHeadAttention]] computes, kept for reference rather than for
+  * use: each head is its own [[Attention]] in a `List`, so the per-head structure stays visible
+  * instead of being folded into batched tensors. That is also what makes it slower — the per-head
+  * parameters are separate tensors rather than one.
+  *
+  * [[MultiHeadAttention]] is tested against it, so the batched implementation is known to agree.
   */
-
 class ReferenceMultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     params: ReferenceMultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V],
     createAttentionMask: Shape2[Target, Source] => Tensor2[Target, Source, Bool],

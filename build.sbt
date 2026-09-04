@@ -4,22 +4,57 @@ import scala.sys.process._
 run / fork := true
 Global / cancelable := true
 
-ThisBuild / version := "0.2-SNAPSHOT"
+ThisBuild / version := "0.1.0"
 ThisBuild / scalaVersion := "3.8.1"
 ThisBuild / organization := "ch.contrafactus"
+ThisBuild / versionScheme := Some("early-semver")
+
+// Publishing to Sonatype Central. The `ch.contrafactus` namespace is verified once for the whole
+// organisation, so deepwit needs no verification of its own.
+ThisBuild / sonatypeCredentialHost := "central.sonatype.com"
+ThisBuild / publishTo := {
+  if (isSnapshot.value)
+    Some("central-snapshots" at "https://central.sonatype.com/repository/maven-snapshots/")
+  else
+    sonatypePublishToBundle.value
+}
+ThisBuild / publishMavenStyle := true
+ThisBuild / homepage := Some(url("https://github.com/dimwit-dev/deepwit"))
+ThisBuild / licenses := List("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/dimwit-dev/deepwit"),
+    "scm:git@github.com:dimwit-dev/deepwit.git"
+  )
+)
+ThisBuild / developers := List(
+  Developer(
+    id = "dimwit-dev",
+    name = "DeepWit Contributors",
+    email = "",
+    url = url("https://github.com/dimwit-dev")
+  )
+)
 
 // scalafix's RemoveUnused reads the compiler's own unused warnings on Scala 3, so it needs both
 // semanticdb and -Wunused to be on. Run it with `sbt scalafixAll`.
 ThisBuild / semanticdbEnabled := true
 ThisBuild / scalacOptions += "-Wunused:imports"
 
-// deepwit tracks the dimwit/plotwit 0.2 snapshots and is itself snapshot-only for now.
-// NOTE: dimwit-core 0.2-SNAPSHOT is not on this resolver yet (only 0.1.0-SNAPSHOT is), and
-// plotwit is not published at all, so both currently resolve from the local ivy repo via
-// `publishLocal`. CI cannot resolve either until dimwit 0.2-SNAPSHOT is published here.
+// `core` depends only on released artifacts so that it can be published and consumed without any
+// local publishing. `examples` additionally needs plotwit, which is not published anywhere yet and
+// so still resolves from the local ivy repo via `publishLocal` in the plotwit checkout.
 ThisBuild / resolvers += "Central Portal Snapshots" at "https://central.sonatype.com/repository/maven-snapshots/"
 
+// Consequence of that split: `core` asks for the released dimwit 0.1.0 while the locally published
+// plotwit asks for 0.2-SNAPSHOT, which sbt reads as a binary-incompatible conflict under
+// early-semver. Let the newer snapshot win in `examples`; `core` on its own resolves 0.1.0.
+ThisBuild / libraryDependencySchemes += "ch.contrafactus" %% "dimwit-core" % "always"
+
 addCommandAlias("testAndCoverage", "; clean; coverage; test; coverageReport")
+
+// Publishes `core` only. `examples` depends on plotwit, which is not published.
+addCommandAlias("sonaUploadCore", "; project core; sonatypeCentralUpload; project root")
 
 lazy val uvPython: String =
   sys.env.getOrElse(
@@ -47,7 +82,7 @@ lazy val core = (project in file("core"))
       "org.scalacheck" %% "scalacheck" % "1.18.0" % Test,
       "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0" % Test,
       "dev.scalapy" %% "scalapy-core" % "0.5.3",
-      "ch.contrafactus" %% "dimwit-core" % "0.2-SNAPSHOT" changing ()
+      "ch.contrafactus" %% "dimwit-core" % "0.1.0"
     ),
     // ScalaPy drives a single embedded CPython interpreter, and two suites importing jax at the same
     // time race into a partially initialized module. Whichever suites happen to touch a tensor first
@@ -57,8 +92,12 @@ lazy val core = (project in file("core"))
     // SCALAPY_PYTHON_LIBRARY / SCALAPY_PYTHON_PROGRAMNAME being exported by the shell.
     fork := true,
     javaOptions ++= scalapyJavaOptions,
+    description := "A theory-aligned deep learning library for Scala 3, built on DimWit",
     Compile / packageSrc / publishArtifact := true,
-    Compile / packageDoc / publishArtifact := true
+    Compile / packageDoc / publishArtifact := true,
+    // Ship the library's own sources and docs, not the test ones.
+    Test / packageSrc / publishArtifact := false,
+    Test / packageDoc / publishArtifact := false
   )
 
 // Examples subproject
