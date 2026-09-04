@@ -92,8 +92,12 @@ lazy val core = (project in file("core"))
     // SCALAPY_PYTHON_LIBRARY / SCALAPY_PYTHON_PROGRAMNAME being exported by the shell.
     fork := true,
     javaOptions ++= scalapyJavaOptions,
+    description := "A theory-aligned deep learning library for Scala 3, built on DimWit",
     Compile / packageSrc / publishArtifact := true,
-    Compile / packageDoc / publishArtifact := true
+    Compile / packageDoc / publishArtifact := true,
+    // Ship the library's own sources and docs, not the test ones.
+    Test / packageSrc / publishArtifact := false,
+    Test / packageDoc / publishArtifact := false
   )
 
 // Examples subproject
