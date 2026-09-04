@@ -6,6 +6,11 @@ import dimwit.Label as Λ
 
 import deepwit.{defaultEpsilon, unwrapEpsilon}
 
+/** Rescales by the root mean square over the `L` axis, then scales by the learned weight, as
+  * described in [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467).
+  *
+  * @param epsilon Guards the division. Defaults to the machine epsilon of data type; pass a `Float` to fix it. Pass a function to derive it from the data type.
+  */
 class RMSNorm[L: Λ, V: IsFloating](
     params: RMSNorm.Params[L, V],
     epsilon: Float | (DType => Float) = defaultEpsilon
@@ -15,7 +20,6 @@ class RMSNorm[L: Λ, V: IsFloating](
 
   def apply(x: Tensor1[L, V]): Tensor1[L, V] =
     def rescale(x: Tensor1[L, V]): Tensor1[L, V] =
-      // Unlike LayerNorm, RMSNorm does not re-center: it only divides by the root mean square.
       val meanSquare = x.pow(2).mean
       x /! (meanSquare + ε).sqrt
     rescale(x) * params.weight

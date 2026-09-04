@@ -10,6 +10,10 @@ case class LearningRateSchedulerState[P, State[_]](
 )
 type LearningRateSchedulerStateFor[State[_]] = [P] =>> LearningRateSchedulerState[P, State]
 
+/** Wraps an optimizer so its learning rate follows `schedule`, counting steps from 1.
+  *
+  * @param optF Builds the optimizer at a given learning rate, e.g. `lr => Adam(lr)`.
+  */
 class LearningRateScheduler[State[_]](val optF: Tensor0[Float32] => GradientOptimizer[State], schedule: Tensor0[Int32] => Tensor0[Float32]) extends GradientOptimizer[LearningRateSchedulerStateFor[State]]:
 
   def init[P: TensorTree, V](params: P)(using TreeOf[P, V])(using IsFloating[V]): LearningRateSchedulerState[P, State] =
@@ -24,6 +28,11 @@ class LearningRateScheduler[State[_]](val optF: Tensor0[Float32] => GradientOpti
     val (newParams, newOptState) = opt.update(gradients, params, optState)
     (newParams, LearningRateSchedulerState(step + 1, newOptState))
 
+/** A learning rate as a function of the step count, which starts at 1.
+  *
+  * @param steps How many steps this schedule is defined for, after which it holds its final value.
+  *              [[LearningRateSchedule.followBy]] uses it to know when to hand over.
+  */
 trait LearningRateSchedule(val steps: Tensor0[Int32]) extends (Tensor0[Int32] => Tensor0[Float32])
 
 object LearningRateSchedule:
@@ -54,28 +63,21 @@ object LearningRateSchedule:
       *
       * For all `t < steps`, the schedule evaluates as if `t = 0`, effectively locking
       * the learning rate at its initial starting value until the delay has passed.
-      *
-      * @param delaySteps The number of iterations to delay the schedule's progression.
-      * @return A time-shifted schedule.
       */
     def delay(delaySteps: Tensor0[Int32]): LearningRateSchedule = DelayedSchedule(schedule, delaySteps)
 
+    /** Runs this schedule through its `steps`, then hands over to `second` delayed by that much,
+      * so `second` starts from its own beginning rather than mid-curve.
+      */
     def followBy(second: LearningRateSchedule): LearningRateSchedule = FollowBySchedule(schedule, second)
 
 object LearningRateSchedules:
 
-  /** Creates a schedule that maintains a constant learning rate for a specified number of steps. */
+  /** A schedule of constant `learningRate` for a specified number of `steps`. */
   class ConstantLearningRate(val learningRate: Tensor0[Float32], steps: Int = Int.MaxValue) extends LearningRateSchedule(steps = Tensor0(steps)):
     override def apply(step: Tensor0[Int32]): Tensor0[Float32] = learningRate
 
-  /** Creates a schedule that rises linearly from `minLr` to `maxLr` over a specified number of warmup steps.
-    *
-    * @param vtype The floating-point type to use for the learning rate values.
-    * @param from The initial learning rate at the start of the warmup (typically 0.0).
-    * @param to The peak learning rate reached at the end of the warmup.
-    * @param warmupSteps The number of steps over which the learning rate increases linearly.
-    * @return A linear warmup schedule.
-    */
+  /** A schedule rising linearly from `from` to `to` for a specified number of `warmupSteps`. */
   class LinearSchedule(
       val from: Tensor0[Float32],
       val to: Tensor0[Float32],
@@ -85,6 +87,8 @@ object LearningRateSchedules:
     private val vtype = from.vtype
 
     override def apply(step: Tensor0[Int32]): Tensor0[Float32] =
+      // Steps are 1-based, and the +1 keeps the first step off `from` — with LinearWarmup's
+      // `from = 0` that would be a step at zero learning rate.
       val warmupRatio = minimum((step.asFloat(vtype)) / ((warmupSteps + 1).asFloat(vtype)), 1f)
       from + warmupRatio * (to - from)
 
@@ -94,14 +98,9 @@ object LearningRateSchedules:
         warmupSteps: Tensor0[Int32]
     ): LinearSchedule = new LinearSchedule(0.0f, to, warmupSteps)
 
-  /** Creates a schedule that decays from `maxLr` down to `minLr` following a half-cosine curve.
+  /** A schedule that decays from `from` down to `to` for `decaySteps` following a half-cosine curve.
     *
-    * This schedule has no concept of warmup; it begins decaying immediately at `t = 0`.
-    * Once `t >= decaySteps`, the learning rate locks permanently at `minLr`.
-    *
-    * @param from The initial maximum learning rate at `t = 0`.
-    * @param to The final baseline learning rate to reach after decaying.
-    * @param decaySteps The number of steps over which to apply the decay curve.
+    * Past `decaySteps` the learning rate stays at `to`.
     */
   class CosineDecay(
       val from: Tensor0[Float32],

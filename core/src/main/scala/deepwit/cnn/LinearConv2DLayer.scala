@@ -3,6 +3,11 @@ package deepwit.cnn
 import dimwit.*
 import dimwit.Label as Λ
 
+/** A 2D convolution without bias. For the bias-carrying equivalent, see [[AffineConv2DLayer]].
+  *
+  * @params stride An `Int` stride applies to both spatial axes.
+  * @params padding `Padding.SAME` preserves the spatial extents, while `Padding.VALID` shrinks them.
+  */
 class LinearConv2DLayer[S1: Λ, S2: Λ, InChannel: Λ, OutChannel: Λ, V: IsFloating](
     params: LinearConv2DLayer.Params[S1, S2, InChannel, OutChannel, V],
     stride: Stride2[S1, S2] | Int = 1,

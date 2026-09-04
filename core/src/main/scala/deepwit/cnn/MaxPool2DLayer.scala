@@ -5,9 +5,15 @@ import dimwit.jax.Jax
 import dimwit.python.PyBridge.{liftPyTensor, toPyTensor}
 import dimwit.Label as Λ
 
+/** A sliding-window maximum over the two spatial axes.
+  *
+  * @param window An `Int` window applies to both spatial axes.
+  * @param stride An `Int` stride applies to both spatial axes.
+  * @param padding `Padding.SAME` preserves the spatial extents, while `Padding.VALID` shrinks them.
+  */
 class MaxPool2DLayer[S1: Λ, S2: Λ, V: IsFloating](
     window: Window2[S1, S2] | Int,
-    stride: Stride2[S1, S2] | Int = 1,
+    stride: Stride2[S1, S2] | Int,
     padding: Padding = Padding.SAME
 ) extends (Tensor2[S1, S2, V] => Tensor2[S1, S2, V]):
 
