@@ -22,6 +22,21 @@ trait Embedding derives Label
 
 DeepWit is a deep learning library for Scala 3 built on one idea: **the code should mirror the theory.** DeepWit is build on [DimWit](https://github.com/dimwit-dev/dimwit), a statically typed tensor library with runtime performance on-par with JAX. DeepWit provides core deep learning modules with their minimal conceptual scope to both express their logic clearly and increase reusablility.
 
+## Installation
+
+DeepWit is published for Scala 3. Add both DeepWit and [DimWit](https://github.com/dimwit-dev/dimwit) —
+DeepWit's API is expressed in DimWit's tensor types, so you will import from both:
+
+```scala
+libraryDependencies ++= Seq(
+  "ch.contrafactus" %% "deepwit-core" % "@VERSION@",
+  "ch.contrafactus" %% "dimwit-core" % "0.1.0"
+)
+```
+
+DimWit runs JAX through ScalaPy, so a Python environment with `jax` and `einops` is also required;
+see [DimWit's setup instructions](https://github.com/dimwit-dev/dimwit#installation).
+
 ## Why DeepWit?
 
 DeepWit strips out the framework machinery and leaves the theory standing: no module base class, no indirect loss, no hidden parameters, no hidden gradients, no hidden optimizer states. 
