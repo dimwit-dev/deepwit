@@ -30,7 +30,7 @@ DeepWit's API is expressed in DimWit's tensor types, so you will import from bot
 
 ```scala
 libraryDependencies ++= Seq(
-  "ch.contrafactus" %% "deepwit-core" % "@VERSION@",
+  "ch.contrafactus" %% "deepwit-core" % "0.1.0",
   "ch.contrafactus" %% "dimwit-core" % "0.1.0"
 )
 ```
