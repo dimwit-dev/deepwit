@@ -173,7 +173,7 @@ The user code composes these core modules into custom architectures given the us
 | `deepwit.cnn` | `LinearConv2DLayer`, `AffineConv2DLayer`, both transpose variants, `MaxPool2DLayer` |
 | `deepwit.attention` | scaled-dot-product scores, full / causal / custom masking, multi-head (fused and unfused), self-attention, a readable reference implementation |
 | `deepwit.transformer` | `TransformerBlock`, `CrossTransformerBlock` — the residual skeleton, with the mixers left open |
-| `deepwit.embedder` | `VocabularyEmbedder` (with tied unembedding), `LearnedAbsolutePositionalInjector`, `ImageToPatchEmbedder`, `PositionalEncoding.sinusoidal2D` |
+| `deepwit.embedder` | `VocabularyEmbedder` (with tied unembedding), `LearnedAbsolutePositionalInjector`, `PositionalEncoding.sinusoidal2D` |
 | `deepwit.normalization` | `LayerNorm`, `RMSNorm` |
 | `deepwit.activation` | `sigmoid`, `relu`, `gelu`, `softmax` |
 | `deepwit.loss` | `CategoricalCrossEntropy`, `BernoulliCrossEntropy`, `BinaryCrossEntropy`, `SquaredError`, `AbsoluteError`, `Huber` |
