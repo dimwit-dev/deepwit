@@ -1,6 +1,7 @@
 package deepwit.attention
 
 import dimwit.*
+import dimwit.Conversions.given
 import deepwit.activation.softmax
 import deepwit.base.LinearLayer
 import dimwit.Label as Λ
@@ -38,7 +39,7 @@ abstract class Attention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
   private final def calculateAttentionWeights(queries: Tensor2[Target, Query, V], keys: Tensor2[Source, Key, V]) =
     val attentionScores = attentionScore(queries, keys)
     val attentionMask = createAttentionMask(attentionScores.shape)
-    val maskedScores = where(attentionMask, attentionScores, Tensor.like(attentionScores).fill(Float.NegativeInfinity))
+    val maskedScores = where_!(attentionMask, attentionScores, Float.NegativeInfinity)
     maskedScores.vapply(Axis[Source])(softmax)
 
   /** Creates a boolean mask indicating which source positions each target position may attend to.

@@ -1,6 +1,7 @@
 package deepwit.regularization
 
 import dimwit.*
+import dimwit.Conversions.given
 import dimwit.stats.Bernoulli
 import dimwit.Label as Λ
 
@@ -57,4 +58,4 @@ object Perturbation:
     val keepProbability = Tensor0(1f) - probability
     val ones = Tensor(Shape1(extent)).fill(1f)
     val kept = Bernoulli(Prob(ones.scale(keepProbability))).sample(key)
-    where(kept, ones / ones.scale(keepProbability), Tensor(Shape1(extent)).fill(0f))
+    where_!(kept, ones / ones.scale(keepProbability), 0f)
