@@ -4,7 +4,7 @@ import scala.sys.process._
 run / fork := true
 Global / cancelable := true
 
-ThisBuild / version := "0.2.0"
+ThisBuild / version := "0.2.1"
 ThisBuild / scalaVersion := "3.9.0"
 ThisBuild / organization := "ch.contrafactus"
 ThisBuild / versionScheme := Some("early-semver")
