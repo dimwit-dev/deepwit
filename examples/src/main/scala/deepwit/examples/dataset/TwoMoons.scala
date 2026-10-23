@@ -30,8 +30,8 @@ object TwoMoons:
       val batchSize = batchExtent.size
       Iterator.iterate(0)(_ + batchSize).map: offset =>
         val batchIds = (0 until batchSize).map(i => (offset + i) % totalSamples)
-        val batchFeatures = features.slice(Axis[Sample].at(batchIds)).relabel(Axis[Sample], Axis[Batch])
-        val batchLabels = labels.slice(Axis[Sample].at(batchIds)).relabel(Axis[Sample], Axis[Batch])
+        val batchFeatures = features(Axis[Sample].at(batchIds)).relabel(Axis[Sample], Axis[Batch])
+        val batchLabels = labels(Axis[Sample].at(batchIds)).relabel(Axis[Sample], Axis[Batch])
         BatchSample(batchFeatures, batchLabels)
 
   def sampleFix(count: Int, noiseScale: Float): Dataset = sample(count, noiseScale, Key(42))

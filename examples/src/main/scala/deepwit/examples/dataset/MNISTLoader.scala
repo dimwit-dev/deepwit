@@ -19,8 +19,8 @@ case class MNISTDataset[S: Label](images: Tensor3[S, Height, Width, Float32], la
     val batchSize = batchExtent.size
     Iterator.iterate(0)(_ + batchSize).map: offset =>
       val batchIds = (0 until batchSize).map(i => (offset + i) % totalSamples)
-      val batchImages = images.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
-      val batchLabels = labels.slice(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
+      val batchImages = images(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
+      val batchLabels = labels(Axis[S].at(batchIds)).relabel(Axis[S], Axis[Batch])
       MNISTBatchSample(batchImages, batchLabels)
 
 object MNISTLoader:

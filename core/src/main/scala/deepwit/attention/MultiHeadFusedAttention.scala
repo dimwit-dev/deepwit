@@ -11,10 +11,6 @@ import scala.util.Try
 /** Marker trait for multi-head attention implementations that use [[FusedMultiHeadAttentionKernel]]. Restricted to BFloat16 due to kernel constraints. */
 trait MultiHeadFusedAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ]:
   this: MultiHeadAttention[Source, SourceEmbedding, Target, TargetEmbedding, BFloat16] =>
-  protected final def headAttention(
-      headParams: Attention.Params[SourceEmbedding, TargetEmbedding, HeadQuery, HeadKey, HeadValue, BFloat16]
-  ): Attention[Source, SourceEmbedding, Target, TargetEmbedding, HeadQuery, HeadKey, HeadValue, BFloat16] =
-    throw new RuntimeException("Fused attention does not run head-by-head, so this method should never be called.")
 
 // --- Fused multi-head attention implementations ---
 
@@ -25,10 +21,11 @@ class MultiHeadFusedFullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
 ) extends MultiHeadFullAttention[Source, SourceEmbedding, Target, TargetEmbedding, BFloat16](sourceAxis, targetAxis, params) with MultiHeadFusedAttention[Source, SourceEmbedding, Target, TargetEmbedding]:
 
   override protected def attend(
-      source: Tensor2[Source, SourceEmbedding, BFloat16],
-      target: Tensor2[Target, TargetEmbedding, BFloat16]
-  ): (Tensor3[Target, Head, HeadValue, BFloat16], MultiHeadAttention.Intermediates[Source, Target, BFloat16]) =
-    FusedMultiHeadAttentionKernel.attend(params, source, target, isCausal = false)
+      queries: Tensor3[Target, Head, HeadQuery, BFloat16],
+      keys: Tensor3[Source, Head, HeadKey, BFloat16],
+      values: Tensor3[Source, Head, HeadValue, BFloat16]
+  ): Tensor3[Target, Head, HeadValue, BFloat16] =
+    FusedMultiHeadAttentionKernel.attend(queries, keys, values, isCausal = false)
 
 object MultiHeadFusedFullAttention:
   export FusedMultiHeadAttentionKernel.canRun as isAvailable
@@ -40,10 +37,11 @@ class MultiHeadFusedCausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ,
 ) extends MultiHeadCausalAttention[Source, SourceEmbedding, Target, TargetEmbedding, BFloat16](sourceAxis, targetAxis, params) with MultiHeadFusedAttention[Source, SourceEmbedding, Target, TargetEmbedding]:
 
   override protected def attend(
-      source: Tensor2[Source, SourceEmbedding, BFloat16],
-      target: Tensor2[Target, TargetEmbedding, BFloat16]
-  ): (Tensor3[Target, Head, HeadValue, BFloat16], MultiHeadAttention.Intermediates[Source, Target, BFloat16]) =
-    FusedMultiHeadAttentionKernel.attend(params, source, target, isCausal = true)
+      queries: Tensor3[Target, Head, HeadQuery, BFloat16],
+      keys: Tensor3[Source, Head, HeadKey, BFloat16],
+      values: Tensor3[Source, Head, HeadValue, BFloat16]
+  ): Tensor3[Target, Head, HeadValue, BFloat16] =
+    FusedMultiHeadAttentionKernel.attend(queries, keys, values, isCausal = true)
 
 object MultiHeadFusedCausalAttention:
   export FusedMultiHeadAttentionKernel.canRun as isAvailable
@@ -60,17 +58,13 @@ private[attention] object FusedMultiHeadAttentionKernel:
     dtype == DType.BFloat16 && hasCudaDevice
 
   /** Kernel implementation. */
-  def attend[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ](
-      params: MultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, BFloat16],
-      source: Tensor2[Source, SourceEmbedding, BFloat16],
-      target: Tensor2[Target, TargetEmbedding, BFloat16],
+  def attend[Source: Λ, Target: Λ](
+      queries: Tensor3[Target, Head, HeadQuery, BFloat16],
+      keys: Tensor3[Source, Head, HeadKey, BFloat16],
+      values: Tensor3[Source, Head, HeadValue, BFloat16],
       isCausal: Boolean
-  ): (Tensor3[Target, Head, HeadValue, BFloat16], MultiHeadAttention.Intermediates[Source, Target, BFloat16]) =
-    val queries = target.dot(Axis[TargetEmbedding])(params.queryWeights)
-    val keys = source.dot(Axis[SourceEmbedding])(params.keyWeights)
-    val values = source.dot(Axis[SourceEmbedding])(params.valueWeights)
-
-    val res = PyBridge.liftPyTensor[(Target, Head, HeadValue), BFloat16]:
+  ): Tensor3[Target, Head, HeadValue, BFloat16] =
+    PyBridge.liftPyTensor[(Target, Head, HeadValue), BFloat16]:
       Jax.jnn.dot_product_attention(
         PyBridge.toPyTensor(queries),
         PyBridge.toPyTensor(keys),
@@ -78,5 +72,3 @@ private[attention] object FusedMultiHeadAttentionKernel:
         is_causal = isCausal,
         implementation = "cudnn"
       )
-
-    (res, (queries = queries, keys = keys, values = values))

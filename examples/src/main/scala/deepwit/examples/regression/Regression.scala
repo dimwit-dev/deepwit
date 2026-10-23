@@ -136,14 +136,14 @@ def eval(): Unit =
   val grid = NoisyCurve.grid(gridSize)
   display(overlay(
     plots.scatterPlot(
-      data.xs.slice(Axis[Feature].at(0)),
+      data.xs(Axis[Feature].at(0)),
       data.ys,
       _.encoding.x.title := "x",
       _.encoding.y.title := "y",
       _.encoding.size := Json.obj("value" -> Json.fromInt(18))
     ),
     plots.linePlot(
-      grid.slice(Axis[Feature].at(0)),
+      grid(Axis[Feature].at(0)),
       grid.vmap(Axis[Sample])(model),
       _.title := "The model, over points it was never shown",
       _.encoding.color := Json.obj("value" -> Json.fromString("#f58518"))
@@ -161,8 +161,8 @@ case class Dataset(xs: Tensor2[Sample, Feature, Float32], ys: Tensor1[Sample, Fl
     Iterator.iterate(0)(_ + batchExtent.size).map: offset =>
       val ids = (0 until batchExtent.size).map(i => (offset + i) % count)
       BatchSample(
-        xs.slice(Axis[Sample].at(ids)).relabel(Axis[Sample], Axis[Batch]),
-        ys.slice(Axis[Sample].at(ids)).relabel(Axis[Sample], Axis[Batch])
+        xs(Axis[Sample].at(ids)).relabel(Axis[Sample], Axis[Batch]),
+        ys(Axis[Sample].at(ids)).relabel(Axis[Sample], Axis[Batch])
       )
 
 object NoisyCurve:
@@ -179,7 +179,7 @@ object NoisyCurve:
     val (positionKey, noiseKey) = key.split2()
     val shape = Shape(Axis[Sample] -> count, featureExtent)
     val xs = Uniform(Tensor(shape).fill(lower), Tensor(shape).fill(upper)).sample(positionKey)
-    val x = xs.slice(Axis[Feature].at(0))
+    val x = xs(Axis[Feature].at(0))
     val noise = Normal.standardNormal(x.shape).sample(noiseKey) *! noiseScale
     Dataset(xs, truth(x) + noise)
 

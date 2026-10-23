@@ -51,7 +51,7 @@ def eval(): Unit =
     coordinates
       .vmap(Axis[Row]):
         _.vmap(Axis[Column]): point =>
-          softmax(MoonsMLP(params).logits(point)).slice(Axis[Output].at(1))
+          softmax(MoonsMLP(params).logits(point)).select(Axis[Output].at(1))
 
   val deployed = sweep(state.params)
   val draws = Key(7).split(numDraws).toList.map(key => sweep(state.params.thin(thinningProbability, key)))
@@ -70,8 +70,8 @@ def eval(): Unit =
 
 private def trainingPlot(dataset: TwoMoons.Dataset): VegaLiteSpec =
   plots.scatterPlot(
-    dataset.features.slice(Axis[Feature].at(0)),
-    dataset.features.slice(Axis[Feature].at(1)),
+    dataset.features(Axis[Feature].at(0)),
+    dataset.features(Axis[Feature].at(1)),
     dataset.labels.toArray.map(moon => s"moon $moon").toSeq,
     _.title := "The data the model was fitted to",
     _.encoding.x.title := "x",
@@ -109,28 +109,21 @@ private def painted[R: Label, C: Label](field: Tensor2[R, C, Float32], colours: 
 private def shrunk(field: Tensor2[Row, Column, Float32], factor: Int): Tensor2[Row, Column, Float32] =
   def kept(extent: Int) = (0 until extent by factor).toIndexedSeq
   field
-    .slice(Axis[Row].at(kept(field.shape(Axis[Row]))))
-    .slice(Axis[Column].at(kept(field.shape(Axis[Column]))))
+    .select(Axis[Row].at(kept(field.shape(Axis[Row]))))
+    .select(Axis[Column].at(kept(field.shape(Axis[Column]))))
 
 /** Lays the fields out as a `perSide` x `perSide` tiling, as one field over a larger plane.
   *
-  * The axis they are stacked along is relabelled into a pair of axes and each folded into the grid
-  * axis beside it, so the tiles meet exactly: the gaps a plotting library leaves between separate
+  * The axis they are stacked along is unflattened into a pair of axes, each flattened together with the
+  * grid axis beside it, so the tiles meet exactly: the gaps a plotting library leaves between separate
   * panels never exist to be closed.
   */
 private def tiled(fields: Seq[Tensor2[Row, Column, Float32]], perSide: Int): Tensor2[Prime[Row] |*| Row, Prime[Column] |*| Column, Float32] =
   require(fields.size == perSide * perSide, s"A $perSide x $perSide tiling needs ${perSide * perSide} fields, but was given ${fields.size}.")
   stack(fields, Axis[Draw])
-    .relabel(Axis[Draw].as(Axis[Prime[Row] |*| Prime[Column]]))
-    .rearrange(
-      (Axis[Prime[Row] |*| Row], Axis[Prime[Column] |*| Column]),
-      (
-        Axis[Prime[Row]] -> perSide,
-        Axis[Prime[Column]] -> perSide,
-        Axis[Row] -> fields.head.shape(Axis[Row]),
-        Axis[Column] -> fields.head.shape(Axis[Column])
-      )
-    )
+    .unflatten(Axis[Draw], Shape(Axis[Prime[Row]] -> perSide, Axis[Prime[Column]] -> perSide))
+    .flatten((Axis[Prime[Row]], Axis[Row]))
+    .flatten((Axis[Prime[Column]], Axis[Column]))
 
 private type Colour = (Int, Int, Int)
 

@@ -18,8 +18,8 @@ import dimwit.TreeOf.ops.**!
   * val (params, optState) = optimizer.update(grads, state.params, state.optState)
   * val finite = allFinite(grads)
   * TrainState(
-  *   select(finite, params, state.params),
-  *   select(finite, optState, state.optState),
+  *   ifElse(finite, params, state.params),
+  *   ifElse(finite, optState, state.optState),
   *   state.lossScale.next(finite)
   * )
   * }}}
@@ -47,8 +47,8 @@ case class LossScale(scale: Tensor0[Float32], finiteSteps: Tensor0[Int32]):
     val counted = LossScale(scale, finiteSteps + 1)
     val grown = LossScale(scale * growthFactor, 0)
     val backedOff = LossScale(maximum(scale * backoffFactor, minScale), 0)
-    val afterFiniteStep = select(counted.finiteSteps >= growthInterval, grown, counted)
-    select(gradsFinite, afterFiniteStep, backedOff)
+    val afterFiniteStep = ifElse(counted.finiteSteps >= growthInterval, grown, counted)
+    ifElse(gradsFinite, afterFiniteStep, backedOff)
 
 object LossScale:
   def initial(scale: Float = 65536f): LossScale = LossScale(Tensor0(scale), Tensor0(0))
@@ -57,5 +57,5 @@ def allFinite[H: TensorTree, V](grads: Grad[H])(using TreeOf[H, V])(using IsFloa
   grads.value.mapLeaves([T <: Tuple] => (labels: Labels[T]) ?=> (grad: Tensor[T, V]) => grad.isfinite.all).reduce(_ and _)
 
 /** `ifTrue` if `condition` holds, else `ifFalse`, leaf by leaf. Unlike an `if`, this works inside `jit`. */
-def select[P: TensorTree](condition: Tensor0[Bool], ifTrue: P, ifFalse: P): P =
+def ifElse[P: TensorTree](condition: Tensor0[Bool], ifTrue: P, ifFalse: P): P =
   TensorTree[P].zipMap(ifTrue, ifFalse, [T <: Tuple, V] => (labels: Labels[T]) ?=> (a: Tensor[T, V], b: Tensor[T, V]) => where_!(condition, a, b))

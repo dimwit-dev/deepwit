@@ -9,7 +9,7 @@ import deepwit.training.after
 import deepwit.activation.gelu
 import deepwit.base.{AffineFormLayer, AffineLayer}
 import deepwit.loss.SquaredError
-import deepwit.optimizer.{LossScale, allFinite, select}
+import deepwit.optimizer.{LossScale, allFinite, ifElse}
 
 trait Sample derives Label
 trait Feature derives Label
@@ -66,7 +66,7 @@ def mixedPrecision(): Unit =
   val (dataKey, initKey) = Key(42).split2()
   val shape = Shape(Axis[Sample] -> numSamples, Axis[Feature] -> 1)
   val xs = Uniform(Tensor(shape).fill(-1f), Tensor(shape).fill(1f)).sample(dataKey)
-  val ys = (xs.slice(Axis[Feature].at(0)) *! (2f * math.Pi.toFloat)).sin *! amplitude
+  val ys = (xs(Axis[Feature].at(0)) *! (2f * math.Pi.toFloat)).sin *! amplitude
 
   /** Runs the model in `vtype` and the loss in Float32. The master weights stay Float32, and so do their gradients. */
   def costIn[V: IsFloating](vtype: VType[V])(params: MLP.Params[Float32]): Tensor0[Float32] =
@@ -89,8 +89,8 @@ def mixedPrecision(): Unit =
     val (params, optimizerState) = optimizer.update(grads, state.params, state.optimizerState)
     val finite = allFinite(grads)
     TrainState(
-      select(finite, params, state.params),
-      select(finite, optimizerState, state.optimizerState),
+      ifElse(finite, params, state.params),
+      ifElse(finite, optimizerState, state.optimizerState),
       lossScale.next(finite, growthInterval = 200),
       where(finite, state.skippedSteps, state.skippedSteps + 1)
     )

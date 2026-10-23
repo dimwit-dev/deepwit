@@ -29,7 +29,7 @@ object CategoricalCrossEntropy:
     * @param logits Raw model outputs in (-inf, +inf).
     */
   def fromLogits[L: Λ, V: IsFloating](target: Tensor0[Int32], logits: Tensor1[L, V]): Tensor0[V] =
-    val targetLogit = logits.slice(Axis[L].at(target))
+    val targetLogit = logits(Axis[L].at(target))
     val logNormalizer = logsumexp(logits)
     logNormalizer - targetLogit
 
@@ -38,7 +38,7 @@ object CategoricalCrossEntropy:
     */
   def stable[L: Λ, V: IsFloating](ε: Tensor0[V])(target: Tensor0[Int32], prediction: Tensor1[L, V]): Tensor0[V] =
     val p = prediction.clip(ε, 1f - ε)
-    -p.slice(Axis[L].at(target)).log
+    -p(Axis[L].at(target)).log
 
 /** * Bernoulli Cross Entropy Losses for discrete binary labels.
   * * Specifically for classification tasks where the outcome is Boolean.

@@ -57,7 +57,7 @@ class LossScaleSuite extends AnyFunSpec with Matchers:
     it("does not back off below minScale"):
       LossScale(Tensor0(1f), Tensor0(0)).next(Tensor0(false)).scale.item shouldBe 1f
 
-  describe("select"):
+  describe("ifElse"):
 
     it("keeps or replaces every leaf, whatever its shape, inside jit"):
       val optimizer = Adam(Tensor0(0.1f))
@@ -65,7 +65,7 @@ class LossScaleSuite extends AnyFunSpec with Matchers:
       val (newParams, newOptState) = optimizer.update(Autodiff.grad(cost)(params), params, optState)
 
       val step = jit: (finite: Tensor0[Bool]) =>
-        (select(finite, newParams, params), select(finite, newOptState, optState))
+        (ifElse(finite, newParams, params), ifElse(finite, newOptState, optState))
 
       val (skippedParams, skippedOptState) = step(Tensor0(false))
       skippedParams.weight should approxEqual(params.weight, 0f)

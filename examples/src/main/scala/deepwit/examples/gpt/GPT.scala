@@ -2,7 +2,7 @@ package deepwit.examples.gpt
 
 import dimwit.*
 import deepwit.activation.softmax
-import deepwit.attention.{Head, HeadKey, HeadQuery, HeadValue}
+import deepwit.attention.{Head, HeadKey, HeadQuery, HeadValue, KVCache}
 import dimwit.stats.Categorical
 import deepwit.embedder.VocabularyEmbedder
 import deepwit.embedder.LearnedAbsolutePositionalInjector
@@ -30,35 +30,37 @@ class GPT[V: IsFloating](params: GPT.Params[V]):
     logits(tokenContext)
       .argmax(Axis[Vocab])
 
-  def generate(
-      prompt: Seq[Int],
-      contextSize: Int = 1024,
-      temperature: Float = 1.0f
-  )(using key: Key): LazyList[Int] =
-    val initialContext = if prompt.size > contextSize then prompt.takeRight(contextSize) else prompt
-    val fastLogits = jit(logits)
+  /** The [[KVCache]]s of a prompt, which fills `tokenContext` from its start, to [[decode]] the positions after it. */
+  def prefill(tokenContext: Tensor1[Context, Int32]): List[KVCache[Context, V]] =
+    val embeddingContext = tokenContext.vmap(Axis[Context])(embedder)
+    val (_, caches) = causalTransformer.prefill(positionalInjector(embeddingContext))
+    caches
 
-    LazyList.unfold((initialContext, key)): (currentContext, currentKey) =>
+  /** The logits for the token after `token` at `position`, as [[logits]] would compute them, given the caches of the positions before. */
+  def decode(caches: List[KVCache[Context, V]], position: Tensor0[Int32], token: Tensor0[Int32]): (Tensor1[Vocab, V], List[KVCache[Context, V]]) =
+    val embedding = positionalInjector.injectAt(position)(embedder(token))
+    val (mixed, nextCaches) = causalTransformer.decode(caches, position, embedding)
+    (outputProjection(mixed), nextCaches)
 
-      val padLength = contextSize - currentContext.size
-      val padded = currentContext ++ Seq.fill(padLength)(0)
+  /** Samples `numTokens` tokens following `prompt`, decoding one position at a time with [[KVCache]]s.
+    *
+    * The whole loop runs as one `scan` on the device. The last token of the prompt is decoded once more, so that
+    * every step samples from the logits it decoded itself.
+    */
+  def generate(prompt: Seq[Int], numTokens: Int, temperature: Float = 1.0f)(using key: Key): Seq[Int] =
+    val contextSize = params.positionalInjectorParams.positionalEmbeddings.shape(Axis[Context])
+    require(prompt.nonEmpty, "Generating needs a prompt of at least one token.")
+    require(prompt.size + numTokens <= contextSize, s"A prompt of ${prompt.size} tokens leaves room for ${contextSize - prompt.size} more, not $numTokens.")
 
-      val contextTensor = Tensor1(Axis[Context], VType[Int32]).fromArray(padded.toArray)
-      val stepLogits = fastLogits(contextTensor)
-      val lastLogits = stepLogits.slice(Axis[Context].at(currentContext.size - 1))
-      val scaledLogits = lastLogits /! temperature
-      val probs = Prob(softmax(scaledLogits.asFloat32))
-
-      val (nextKey, sampleKey) = currentKey.split2()
-      val nextTokenTensor = Categorical(probs).sample(sampleKey)
-      val nextToken = nextTokenTensor.item
-
-      val nextContext = if currentContext.size >= contextSize then
-        currentContext.tail :+ nextToken
-      else
-        currentContext :+ nextToken
-
-      Some((nextToken, (nextContext, nextKey)))
+    val caches = prefill(Tensor1(Axis[Context], VType[Int32]).fromArray(prompt.padTo(contextSize, 0).toArray))
+    val positions = Tensor(Shape1(Axis[Context] -> numTokens)).fromArray(Array.range(prompt.size - 1, prompt.size - 1 + numTokens))
+    val (_, tokens) = scan(Axis[Context])((caches, Tensor0(prompt.last), key), positions):
+      case ((caches, token, key), position) =>
+        val (logits, nextCaches) = decode(caches, position, token)
+        val (nextKey, sampleKey) = key.split2()
+        val nextToken = Categorical(Prob(softmax(logits.asFloat32 /! temperature))).sample(sampleKey)
+        ((nextCaches, nextToken, nextKey), nextToken)
+    tokens.toArray.toSeq
 
 object GPT:
 

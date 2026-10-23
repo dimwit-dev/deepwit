@@ -35,8 +35,8 @@ class LearnedAbsolutePositionalInjectorSuite extends AnyFunSpec with Matchers:
       val injector = LearnedAbsolutePositionalInjector(params)
       val context = Tensor(Shape(contextExtent, embeddingExtent)).fill(0f)
       val injected = injector(context)
-      val first = injected.slice(Axis[A].at(0))
-      val second = injected.slice(Axis[A].at(1))
+      val first = injected(Axis[A].at(0))
+      val second = injected(Axis[A].at(1))
       (first - second).abs.max.item should be > 0f
 
     it("embeds a prefix with the positions it starts at"):

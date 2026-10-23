@@ -81,7 +81,7 @@ class AttentionSuite extends AnyFunSpec with Matchers:
 
     it("gives the first target position only the first source value under a causal mask"):
       val attention = CausalAttention(Axis[Src], Axis[Tgt], paramsWithKeyWeights(identity2(Axis[SrcEmb], Axis[Ky])), AttentionScore.scaledDotProduct)
-      val firstRow = attention(source, target).slice(Axis[Tgt].at(0))
+      val firstRow = attention(source, target).select(Axis[Tgt].at(0))
       firstRow should approxEqual(Tensor(Shape1(Axis[Vl] -> 2)).fromArray(Array(1f, 2f)), 1e-5f)
 
     it("honours a custom attention score function"):

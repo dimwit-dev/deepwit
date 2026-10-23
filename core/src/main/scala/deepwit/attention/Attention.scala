@@ -31,25 +31,40 @@ abstract class Attention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbe
     val queries = target.vmap(Axis[Target])(projectQuery)
     val keys = source.vmap(Axis[Source])(projectKey)
     val values = source.vmap(Axis[Source])(projectValue)
-    val attentionWeights = calculateAttentionWeights(queries, keys)
-    val attentionValues = attentionWeights.dot(Axis[Source])(values)
-    (attentionValues, (queries = queries, keys = keys, values = values))
-
-  private final def calculateAttentionWeights(queries: Tensor2[Target, Query, V], keys: Tensor2[Source, Key, V]) =
-    val attentionScores = attentionScore(queries, keys)
-    val attentionMask = createAttentionMask(attentionScores.shape)
-    val maskedScores = where_!(attentionMask, attentionScores, Float.NegativeInfinity)
-    maskedScores.vapply(Axis[Source])(softmax)
+    val targetPositions = Tensor1(Axis[Target]).fromRange(0 until target.shape(Axis[Target]))
+    val sourcePositions = Tensor1(Axis[Source]).fromRange(0 until source.shape(Axis[Source]))
+    val attended = Attention.attend(attentionScore, createAttentionMask)(queries, keys, values, targetPositions, sourcePositions)
+    (attended, (queries = queries, keys = keys, values = values))
 
   /** Creates a boolean mask indicating which source positions each target position may attend to.
     *
-    * @param scoreShape The shape of the attention scores (same shape as attention weights).
     * @return A boolean tensor where `mask(row, col) == true` means the target position
     *         at `row` is allowed to attend to the source position at `col`.
     */
-  protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool]
+  protected def createAttentionMask(targetPositions: Tensor1[Target, Int32], sourcePositions: Tensor1[Source, Int32]): Tensor2[Target, Source, Bool]
 
 object Attention:
+
+  /** Attends from the `queries` to the `keys` and `values`: scores them with `attentionScore`, hides what
+    * `attentionMask` does not allow, and averages the values weighted by the softmax of the scores.
+    *
+    * @param targetPositions The positions of the queries, e.g. a single one when decoding with a [[KVCache]].
+    * @param sourcePositions The positions of the keys and values.
+    */
+  def attend[Source: Λ, Target: Λ, Query, Key, Value: Λ, V: IsFloating](
+      attentionScore: AttentionScore[Target, Source, Query, Key, V],
+      attentionMask: AttentionMask[Target, Source]
+  )(
+      queries: Tensor2[Target, Query, V],
+      keys: Tensor2[Source, Key, V],
+      values: Tensor2[Source, Value, V],
+      targetPositions: Tensor1[Target, Int32],
+      sourcePositions: Tensor1[Source, Int32]
+  ): Tensor2[Target, Value, V] =
+    val attentionScores = attentionScore(queries, keys)
+    val maskedScores = where_!(attentionMask(targetPositions, sourcePositions), attentionScores, Float.NegativeInfinity)
+    val attentionWeights = maskedScores.vapply(Axis[Source])(softmax)
+    attentionWeights.dot(Axis[Source])(values)
 
   /** Holds the intermediate tensors computed during attention. */
   type Intermediates[Source, Target, Query, Key, Value, V] = (
@@ -90,7 +105,8 @@ class FullAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding
     attentionScore: AttentionScore[Target, Source, Query, Key, V]
 ) extends Attention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V](params, attentionScore):
 
-  override protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool] = fullMask(scoreShape)
+  override protected def createAttentionMask(targetPositions: Tensor1[Target, Int32], sourcePositions: Tensor1[Source, Int32]): Tensor2[Target, Source, Bool] =
+    fullMask(targetPositions, sourcePositions)
 
 /** Attention where a target position may only attend to source positions up to its own index. */
 class CausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
@@ -100,16 +116,23 @@ class CausalAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbeddi
     attentionScore: AttentionScore[Target, Source, Query, Key, V]
 ) extends Attention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V](params, attentionScore):
 
-  override protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool] = causalMask(scoreShape)
+  override protected def createAttentionMask(targetPositions: Tensor1[Target, Int32], sourcePositions: Tensor1[Source, Int32]): Tensor2[Target, Source, Bool] =
+    causalMask(targetPositions, sourcePositions)
 
-/** @param mask Creates a boolean mask indicating which source positions each target position may attend to. */
+/** @param attentionMask Creates a boolean mask indicating which source positions each target position may attend to. */
 class CustomAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, Query: Λ, Key: Λ, Value: Λ, V: IsFloating](
     params: Attention.Params[SourceEmbedding, TargetEmbedding, Query, Key, Value, V],
-    attentionMask: Shape2[Target, Source] => Tensor2[Target, Source, Bool],
+    attentionMask: AttentionMask[Target, Source],
     attentionScore: AttentionScore[Target, Source, Query, Key, V]
 ) extends Attention[Source, SourceEmbedding, Target, TargetEmbedding, Query, Key, Value, V](params, attentionScore):
 
-  override protected def createAttentionMask(scoreShape: Shape2[Target, Source]): Tensor2[Target, Source, Bool] = attentionMask(scoreShape)
+  override protected def createAttentionMask(targetPositions: Tensor1[Target, Int32], sourcePositions: Tensor1[Source, Int32]): Tensor2[Target, Source, Bool] =
+    attentionMask(targetPositions, sourcePositions)
 
-private def causalMask[Context: Λ, CrossContext: Λ](scoreShape: Shape2[Context, CrossContext]): Tensor[(Context, CrossContext), Bool] = tril(fullMask(scoreShape))
-private def fullMask[Context: Λ, CrossContext: Λ](scoreShape: Shape2[Context, CrossContext]): Tensor[(Context, CrossContext), Bool] = Tensor(scoreShape).fill(true)
+/** A target position may attend to the source positions up to and including its own. */
+private def causalMask[Target: Λ, Source: Λ](targetPositions: Tensor1[Target, Int32], sourcePositions: Tensor1[Source, Int32]): Tensor2[Target, Source, Bool] =
+  targetPositions.vmap(Axis[Target])(targetPosition => sourcePositions <=! targetPosition)
+
+/** A target position may attend to every source position. */
+private def fullMask[Target: Λ, Source: Λ](targetPositions: Tensor1[Target, Int32], sourcePositions: Tensor1[Source, Int32]): Tensor2[Target, Source, Bool] =
+  Tensor(Shape(targetPositions.shape.extent(Axis[Target]), sourcePositions.shape.extent(Axis[Source]))).fill(true)

@@ -21,7 +21,11 @@ class LearnedAbsolutePositionalInjector[Context: Λ, Embedding: Λ, V: IsFloatin
     val length = context.shape(Axis[Context])
     val capacity = params.positionalEmbeddings.shape(Axis[Context])
     require(length <= capacity, s"A context of $length positions was given, but only $capacity were learned.")
-    context + params.positionalEmbeddings.slice(Axis[Context].at(0 until length))
+    context + params.positionalEmbeddings(Axis[Context].at(0 until length))
+
+  /** Adds the positional embedding of `position` to the `embedding` there, e.g. when decoding one position at a time. */
+  def injectAt(position: Tensor0[Int32])(embedding: Tensor1[Embedding, V]): Tensor1[Embedding, V] =
+    embedding + params.positionalEmbeddings(Axis[Context].at(position))
 
 object LearnedAbsolutePositionalInjector:
 

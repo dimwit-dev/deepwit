@@ -52,8 +52,8 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
       val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], zeroed)
       val expectedRow = Tensor(Shape1(embExtent)).fromArray(Array(1f, 2f, 3f, 4f))
       val result = attention(source(), target)
-      result.slice(Axis[Tgt].at(0)) should approxEqual(expectedRow, 1e-5f)
-      result.slice(Axis[Tgt].at(2)) should approxEqual(expectedRow, 1e-5f)
+      result(Axis[Tgt].at(0)) should approxEqual(expectedRow, 1e-5f)
+      result(Axis[Tgt].at(2)) should approxEqual(expectedRow, 1e-5f)
 
     it("attends across a source whose embedding space differs from the target's"):
       // Head query and key extents both follow the target embedding, so the dot product lines up.
@@ -86,8 +86,8 @@ class MultiHeadAttentionSuite extends AnyFunSpec with Matchers:
       val attention = MultiHeadFullAttention(Axis[Src], Axis[Tgt], params())
       val (_, intermediates) = attention.applyWithIntermediates(source(), target)
       // The queries are the target read through each head's own query weights.
-      val firstHeadQueries = target.dot(Axis[TgtEmb])(params().queryWeights.slice(Axis[Head].at(0)))
-      intermediates.queries.slice(Axis[Head].at(0)) should approxEqual(firstHeadQueries, 1e-5f)
+      val firstHeadQueries = target.dot(Axis[TgtEmb])(params().queryWeights(Axis[Head].at(0)))
+      intermediates.queries(Axis[Head].at(0)) should approxEqual(firstHeadQueries, 1e-5f)
 
   describe("MultiHeadAttention.Params.xavierUniformDepthScaled"):
 

@@ -9,7 +9,7 @@ import dimwit.Label as Λ
 class VocabularyEmbedder[Vocab: Λ, Embedding: Λ, V: IsFloating](params: VocabularyEmbedder.Params[Vocab, Embedding, V]) extends (Tensor0[Int32] => Tensor1[Embedding, V]):
 
   override def apply(token: Tensor0[Int32]): Tensor1[Embedding, V] =
-    params.vocabularyEmbeddings.slice(Axis[Vocab].at(token))
+    params.vocabularyEmbeddings(Axis[Vocab].at(token))
 
   /** Scores every token by projecting onto its embedding, through the matrix the lookup uses —
     * weight tying, as described in [Using the Output Embedding to Improve Language Models](https://arxiv.org/abs/1608.05859).

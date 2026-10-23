@@ -18,8 +18,7 @@ def eval(): Unit =
   require(iterations.nonEmpty, s"No checkpoint to render in ${checkpointer.rootPath}.")
   println(s"Loading checkpoints from: ${checkpointer.rootPath}, steps ${iterations.mkString(", ")}")
 
-  val originals = MNISTLoader.createTestDataset().get.images
-    .slice(Axis[TestSample].at(0 until 64))
+  val originals = MNISTLoader.createTestDataset().get.images(Axis[TestSample].at(0 until 64))
 
   val originalsImgPanel = toImgPanel(originals)
   display(vconcat(
@@ -38,11 +37,9 @@ def eval(): Unit =
 /** Lays 64 samples out as an 8x8 tiling of the digits, so a whole batch reads as one image. */
 private def toImgPanel(tensor: Tensor3[TestSample, Height, Width, Float32]): Tensor2[Prime[Width] |*| Width, Prime[Height] |*| Height, UInt8] =
   tensor
-    .relabel(Axis[TestSample].as(Axis[Prime[Height] |*| Prime[Width]]))
-    .rearrange(
-      (Axis[Prime[Height] |*| Height], Axis[Prime[Width] |*| Width]),
-      (Axis[Prime[Height]] -> 8, Axis[Prime[Width]] -> 8, Axis[Height] -> 28, Axis[Width] -> 28)
-    )
+    .unflatten(Axis[TestSample], Shape(Axis[Prime[Height]] -> 8, Axis[Prime[Width]] -> 8))
+    .flatten((Axis[Prime[Height]], Axis[Height]))
+    .flatten((Axis[Prime[Width]], Axis[Width]))
     .clip(0f, 1f)
     .scale(255f)
     .asInt(VType[UInt8])

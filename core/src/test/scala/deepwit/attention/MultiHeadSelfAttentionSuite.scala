@@ -54,15 +54,20 @@ class MultiHeadSelfAttentionSuite extends AnyFunSpec with Matchers:
       val a = attention(context(13f))
       val b = attention(context(-99f))
       // Positions 0 to 2 cannot attend to the perturbed final position.
-      a.slice(Axis[Ctx].at(0 until 3)) should approxEqual(b.slice(Axis[Ctx].at(0 until 3)), 1e-5f)
+      a(Axis[Ctx].at(0 until 3)) should approxEqual(b(Axis[Ctx].at(0 until 3)), 1e-5f)
       // The final position does see the change.
-      (a.slice(Axis[Ctx].at(3)) - b.slice(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
+      (a(Axis[Ctx].at(3)) - b(Axis[Ctx].at(3))).abs.max.item should be > 1e-3f
 
     it("lets a full mask expose later positions to earlier ones"):
       val attention = MultiHeadFullSelfAttention(Axis[Ctx], params)
       val a = attention(context(13f))
       val b = attention(context(-99f))
-      (a.slice(Axis[Ctx].at(0)) - b.slice(Axis[Ctx].at(0))).abs.max.item should be > 1e-3f
+      (a(Axis[Ctx].at(0)) - b(Axis[Ctx].at(0))).abs.max.item should be > 1e-3f
+
+    it("is causal self-attention with a custom causal mask"):
+      val custom = MultiHeadCustomSelfAttention(params, causalMask[Ctx, Ctx], AttentionScore.scaledDotProduct)
+      val causal = MultiHeadCausalSelfAttention(Axis[Ctx], params)
+      custom(context(13f)) should approxEqual(causal(context(13f)), 1e-6f)
 
   describe("MultiHeadSelfAttention.Params.xavierUniformDepthScaled"):
 

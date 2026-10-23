@@ -13,7 +13,7 @@ import dimwit.Label as Λ
   */
 class ReferenceMultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, TargetEmbedding: Λ, V: IsFloating](
     params: ReferenceMultiHeadAttention.Params[SourceEmbedding, TargetEmbedding, V],
-    createAttentionMask: Shape2[Target, Source] => Tensor2[Target, Source, Bool],
+    createAttentionMask: AttentionMask[Target, Source],
     attentionScore: AttentionScore[Target, Source, HeadQuery, HeadKey, V]
 ) extends ((Tensor2[Source, SourceEmbedding, V], Tensor2[Target, TargetEmbedding, V]) => Tensor2[Target, TargetEmbedding, V]):
 

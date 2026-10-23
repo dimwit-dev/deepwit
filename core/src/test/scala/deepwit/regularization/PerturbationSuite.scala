@@ -23,26 +23,26 @@ class PerturbationSuite extends AnyFunSpec with Matchers:
 
   /** Which directions a diagonal lets through, as a mask of ones and zeros. */
   private def survivors(diagonal: Tensor1[Hidden, Float32]): Seq[Float] =
-    (0 until hiddenExtent.size).map(i => if diagonal.slice(Axis[Hidden].at(i)).item == 0f then 0f else 1f)
+    (0 until hiddenExtent.size).map(i => if diagonal(Axis[Hidden].at(i)).item == 0f then 0f else 1f)
 
   private def readScaleOf(thinned: AffineLayer.Params[Hidden, Out, Float32], i: Int): Seq[Float] =
     (0 until outExtent.size).map: o =>
-      val before = layer.weight.slice(Axis[Hidden].at(i)).slice(Axis[Out].at(o)).item
-      val after = thinned.weight.slice(Axis[Hidden].at(i)).slice(Axis[Out].at(o)).item
+      val before = layer.weight.select(Axis[Hidden].at(i)).select(Axis[Out].at(o)).item
+      val after = thinned.weight.select(Axis[Hidden].at(i)).select(Axis[Out].at(o)).item
       if before == 0f then 0f else after / before
 
   describe("Perturbation.thinningDiagonal"):
 
     it("deletes directions and rescales the survivors by one over the keep probability"):
       val diagonal = Perturbation.thinningDiagonal(hiddenExtent, probability, Random.Key(42))
-      val values = (0 until hiddenExtent.size).map(i => diagonal.slice(Axis[Hidden].at(i)).item)
+      val values = (0 until hiddenExtent.size).map(i => diagonal(Axis[Hidden].at(i)).item)
       values should contain(0f) // this draw deleted something, so there is a deletion to look at
       values.filter(_ != 0f).distinct shouldBe Seq(2f) // survivors scaled by 1 / (1 - 0.5)
 
     it("is exactly the identity at a probability of zero, by arithmetic rather than a branch"):
       val diagonal = Perturbation.thinningDiagonal(hiddenExtent, Tensor0(0f), Random.Key(7))
       (0 until hiddenExtent.size).foreach: i =>
-        diagonal.slice(Axis[Hidden].at(i)).item shouldBe 1f
+        diagonal(Axis[Hidden].at(i)).item shouldBe 1f
 
   describe("Perturbation.thin"):
 
@@ -51,7 +51,7 @@ class PerturbationSuite extends AnyFunSpec with Matchers:
       val thinned = Perturbation.thin(layer, probability, key)
       val diagonal = Perturbation.thinningDiagonal(hiddenExtent, probability, key)
       (0 until hiddenExtent.size).foreach: i =>
-        val expected = diagonal.slice(Axis[Hidden].at(i)).item
+        val expected = diagonal(Axis[Hidden].at(i)).item
         readScaleOf(thinned, i).foreach(_ shouldBe expected +- 1e-5f)
       thinned.bias should approxEqual(layer.bias, 1e-6f)
 
@@ -82,5 +82,5 @@ class PerturbationSuite extends AnyFunSpec with Matchers:
       val gradient = Autodiff.grad(cost)(layer).value
       val diagonal = Perturbation.thinningDiagonal(hiddenExtent, probability, key)
       survivors(diagonal).zipWithIndex.foreach: (survived, i) =>
-        val g = gradient.weight.slice(Axis[Hidden].at(i)).slice(Axis[Out].at(0)).item
+        val g = gradient.weight.select(Axis[Hidden].at(i)).select(Axis[Out].at(0)).item
         if survived == 0f then g shouldBe 0f else g shouldBe 2f +- 1e-5f

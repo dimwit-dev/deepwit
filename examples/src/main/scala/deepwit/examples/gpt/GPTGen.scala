@@ -29,16 +29,10 @@ object BPETokenizer:
   print("Response: ")
 
   val promptTokens = BPETokenizer.encode(promptText)
-  val tokenStream = model.generate(promptTokens, contextSize = contextExtent.size, temperature = 0.8f)
   val maxTokens = 200
   val eosTokenId = 50256
 
-  tokenStream
-    .takeWhile(_ != eosTokenId)
-    .take(maxTokens)
-    .foreach: tokenId =>
-      val textChunk = BPETokenizer.decode(Seq(tokenId))
-      print(textChunk)
-      System.out.flush()
+  val response = model.generate(promptTokens, numTokens = maxTokens, temperature = 0.8f).takeWhile(_ != eosTokenId)
+  print(BPETokenizer.decode(response))
 
   println("\n\n[Generation Complete]")

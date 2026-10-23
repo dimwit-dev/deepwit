@@ -32,9 +32,9 @@ class ReferenceMultiHeadAttentionSuite extends AnyFunSpec with Matchers:
   private val perHead = ReferenceMultiHeadAttention.Params(
     heads = (0 until numHeads).toList.map(head =>
       Attention.Params(
-        batched.queryWeights.slice(Axis[Head].at(head)),
-        batched.keyWeights.slice(Axis[Head].at(head)),
-        batched.valueWeights.slice(Axis[Head].at(head))
+        batched.queryWeights(Axis[Head].at(head)),
+        batched.keyWeights(Axis[Head].at(head)),
+        batched.valueWeights(Axis[Head].at(head))
       )
     ),
     outputProjection = batched.outputProjection

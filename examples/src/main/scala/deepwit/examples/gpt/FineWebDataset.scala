@@ -32,10 +32,10 @@ object FineWebDataset:
     ).sample(key)
     val shiftedIndices = randomIndices +! 1
     val inputs = randomIndices.vmap(Axis[Sample])(startIndex =>
-      data.dynamicSlice(startIndex, contextLength).relabelTo(Axis[Context])
+      data(Axis[Sample].at(startIndex, contextLength)).relabelTo(Axis[Context])
     )
     val targets = shiftedIndices.vmap(Axis[Sample])(startIndex =>
-      data.dynamicSlice(startIndex, contextLength).relabelTo(Axis[Context])
+      data(Axis[Sample].at(startIndex, contextLength)).relabelTo(Axis[Context])
     )
     val gpu = GPU.devices.head
     BatchSample(targets.asInt32.toDevice(gpu), inputs.asInt32.toDevice(gpu))

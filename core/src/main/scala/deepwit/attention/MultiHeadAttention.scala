@@ -22,14 +22,17 @@ abstract class MultiHeadAttention[Source: Λ, SourceEmbedding: Λ, Target: Λ, T
       Tensor2[Target, TargetEmbedding, V],
       MultiHeadAttention.Intermediates[Source, Target, V]
   ) =
-    val (heads, intermediates) = attend(source, target)
-    val res = heads.vmap(Axis[Target])(heads => projectHeadValues(heads.flatten))
-    (res, intermediates)
+    val queries = target.dot(Axis[TargetEmbedding])(params.queryWeights)
+    val keys = source.dot(Axis[SourceEmbedding])(params.keyWeights)
+    val values = source.dot(Axis[SourceEmbedding])(params.valueWeights)
+    (projectHeads(attend(queries, keys, values)), (queries = queries, keys = keys, values = values))
 
-  protected def attend(source: Tensor2[Source, SourceEmbedding, V], target: Tensor2[Target, TargetEmbedding, V]): (
-      Tensor3[Target, Head, HeadValue, V],
-      MultiHeadAttention.Intermediates[Source, Target, V]
-  )
+  /** Projects the values attended to by all heads back into the target embedding space. */
+  final def projectHeads(headValues: Tensor3[Target, Head, HeadValue, V]): Tensor2[Target, TargetEmbedding, V] =
+    headValues.vmap(Axis[Target])(headValues => projectHeadValues(headValues.flatten))
+
+  /** Attends from the `queries` of every head to its `keys` and `values`. */
+  protected def attend(queries: Tensor3[Target, Head, HeadQuery, V], keys: Tensor3[Source, Head, HeadKey, V], values: Tensor3[Source, Head, HeadValue, V]): Tensor3[Target, Head, HeadValue, V]
 
 object MultiHeadAttention:
 

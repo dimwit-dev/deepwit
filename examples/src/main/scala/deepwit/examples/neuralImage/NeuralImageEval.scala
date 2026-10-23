@@ -44,8 +44,8 @@ def eval(): Unit =
   val zoom = 4
 
   val trainedCrop = fourierImage
-    .slice(Axis[Height].at((cropTop until cropTop + cropSize).toIndexedSeq))
-    .slice(Axis[Width].at((cropLeft until cropLeft + cropSize).toIndexedSeq))
+    .select(Axis[Height].at((cropTop until cropTop + cropSize).toIndexedSeq))
+    .select(Axis[Width].at((cropLeft until cropLeft + cropSize).toIndexedSeq))
 
   // The network never saw a position between two pixels; the encoding is defined at them all the same.
   val zoomedSize = cropSize * zoom
@@ -81,5 +81,5 @@ private def render(
 private def nearest(image: Tensor3[Height, Width, Channel, Float32], zoom: Int): Tensor3[Height, Width, Channel, Float32] =
   def repeated(extent: Int) = (0 until extent * zoom).map(_ / zoom).toIndexedSeq
   image
-    .slice(Axis[Height].at(repeated(image.shape(Axis[Height]))))
-    .slice(Axis[Width].at(repeated(image.shape(Axis[Width]))))
+    .select(Axis[Height].at(repeated(image.shape(Axis[Height]))))
+    .select(Axis[Width].at(repeated(image.shape(Axis[Width]))))

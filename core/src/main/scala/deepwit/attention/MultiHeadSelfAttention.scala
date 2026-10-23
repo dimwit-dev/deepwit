@@ -35,21 +35,50 @@ class MultiHeadFullSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V]
 ) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadFullAttention(contextAxis, contextAxis, params.multiHeadAttention))
 
-/** Multi-head self-attention with [[MultiHeadCausalAttention]]. */
+/** Multi-head self-attention with [[MultiHeadCausalAttention]].
+  *
+  * Besides attending over a whole context at once, it can decode one position at a time with a [[KVCache]]:
+  * [[prefill]] attends over a prompt and keeps its keys and values, and [[decode]] continues from there.
+  */
 class MultiHeadCausalSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     contextAxis: Axis[Context],
     params: MultiHeadSelfAttention.Params[Embedding, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCausalAttention(contextAxis, contextAxis, params.multiHeadAttention))
+) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCausalAttention(contextAxis, contextAxis, params.multiHeadAttention)):
+
+  private val weights = params.multiHeadAttention
+
+  // Decoding attends from one position to the cache, which the fused kernel cannot, so it always attends head by head.
+  private val decoding = MultiHeadUnfusedCausalAttention(contextAxis, contextAxis, weights, AttentionScore.scaledDotProduct)
+
+  /** Attends over `context` like [[apply]], and keeps its keys and values to [[decode]] the positions after it. */
+  def prefill(context: Tensor2[Context, Embedding, V]): (Tensor2[Context, Embedding, V], KVCache[Context, V]) =
+    val (attended, intermediates) = applyWithIntermediates(context)
+    (attended, KVCache(intermediates.keys, intermediates.values))
+
+  /** Attends from the `embedding` at `position` to itself and every position before it, as [[apply]] would.
+    *
+    * @param cache Holds the keys and values of the positions before `position`.
+    * @param position May be traced, e.g. under `jit` or in a loop.
+    * @return The attended embedding, and `cache` with the key and value of `position` written into it.
+    */
+  def decode(cache: KVCache[Context, V], position: Tensor0[Int32], embedding: Tensor1[Embedding, V]): (Tensor1[Embedding, V], KVCache[Context, V]) =
+    val query = embedding.dot(Axis[Embedding])(weights.queryWeights)
+    val key = embedding.dot(Axis[Embedding])(weights.keyWeights)
+    val value = embedding.dot(Axis[Embedding])(weights.valueWeights)
+    val keys = cache.keys.updated(contextAxis.at(position))(key)
+    val values = cache.values.updated(contextAxis.at(position))(value)
+    val headValues = decoding.attendAt(
+      queries = stack(Seq(query), contextAxis),
+      keys = keys,
+      values = values,
+      targetPositions = stack(Seq(position), contextAxis),
+      sourcePositions = Tensor1(contextAxis).fromRange(0 until keys.shape(contextAxis))
+    )
+    (decoding.projectHeads(headValues).select(contextAxis.at(0)), KVCache(keys, values))
 
 /** Multi-head self-attention with [[MultiHeadCustomAttention]]. */
 class MultiHeadCustomSelfAttention[Context: Λ, Embedding: Λ, V: IsFloating](
     params: MultiHeadSelfAttention.Params[Embedding, V],
-    mask: AxisExtent[Context] => Tensor2[Context, Context, Bool],
+    mask: AttentionMask[Context, Context],
     attentionScore: AttentionScore[Context, Context, HeadQuery, HeadKey, V]
-) extends MultiHeadSelfAttention[Context, Embedding, V](
-      MultiHeadCustomAttention(
-        params.multiHeadAttention,
-        shape2 => mask(shape2.extent(Axis[Context])),
-        attentionScore
-      )
-    )
+) extends MultiHeadSelfAttention[Context, Embedding, V](MultiHeadCustomAttention(params.multiHeadAttention, mask, attentionScore))
